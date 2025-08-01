@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 type TokenType uint;
@@ -55,6 +56,27 @@ const (
 
 	EOF
 );
+
+func IsAlpha(val rune) bool {
+	return 'a' <= val && val <= 'z' || 
+	       'A' <= val && val <= 'Z';
+}
+
+func IsNum(val rune) bool {
+	return '0' <= val && val <= '9';
+}
+
+func IsAlphaNum(val rune) bool {
+	return IsAlpha(val) || IsNum(val);
+}
+
+func Normalize(val int) float64 {
+	var fval = float64(val);
+	for fval > 1 {
+		fval /= 10;
+	}
+	return fval;
+}
 
 func (tt TokenType) ToString() string {
 	return "TODO";
@@ -117,8 +139,8 @@ func (s *Scanner) eof() bool {
 }
 
 // atomic
-func (s *Scanner) generate_error() error {
-	return fmt.Errorf("%s:%d:%d unexpected token", s.filename, s.line, s.current);
+func (s *Scanner) generate_error(description string) error {
+	return fmt.Errorf("%s:%d:%d unexpected token\ndescription: %s", s.filename, s.line, s.current, description);
 }
 
 // atomic: lookahead with one character
@@ -148,17 +170,37 @@ func (s *Scanner) expect_rune(r rune) bool {
 	return false
 }
 
-func (s *Scanner) consume_string() error {
-	literal := make([]rune, 0);
+func (s *Scanner) consume_string() (string, error) {
 	var r rune;
 	for r = s.consume_rune(); !(r == '"' || r == EOF_RUNE); r = s.consume_rune() {
-		literal = append(literal, r);
+		// TODO: handle invalid string characters
+		if (r == '\n') {
+			s.line++;
+		}
 	}
 	if (r == EOF_RUNE) {
-		return s.generate_error();
+		return "", s.generate_error("unterminated string");
 	}
-	s.add_token_literal(STRING, literal);
-	return nil
+	return string(s.source[s.start:s.current]), nil
+}
+
+func (s *Scanner) consume_integer() (int, error) {
+	for r := s.peek_rune(); IsNum(r) && r != EOF_RUNE; r = s.peek_rune() {
+		fmt.Println(string(r), s.start, s.current);
+		s.consume_rune();
+	}
+	literal, err := strconv.Atoi(string(s.source[s.start:s.current]));
+	if err != nil {
+		return 0, s.generate_error(err.Error());
+	}
+	return literal, nil
+}
+
+func (s *Scanner) consume_identifier() (string, error) {
+	for r := s.peek_rune(); IsAlphaNum(r) && r != EOF_RUNE; r = s.peek_rune() {
+		s.consume_rune();
+	}
+	return string(s.source[s.start:s.current]), nil
 }
 
 // cellular
@@ -229,13 +271,48 @@ func (s *Scanner) scan_curr() error {
 			break;
 		}
 		case '"': {
-			if err := s.consume_string(); err != nil {
+			literal ,err := s.consume_string()
+			if err != nil {
 				return err;
 			}
+			s.add_token_literal(STRING, literal);
 			break;
 		}
 		default: {
-			return s.generate_error();
+			if IsNum(char) {
+				s.current--;
+				var literal float64 = 0.0;
+				integer, err := s.consume_integer();
+				if err != nil {
+					return err;
+				}
+				literal += float64(integer);
+				if (s.peek_rune() == '.') {
+					s.consume_rune();
+					if IsNum(s.peek_rune()) {
+						rollback := s.start;
+						s.start = s.current;
+						integer, err = s.consume_integer();
+						s.start = rollback;
+						if err != nil {
+							return err;
+						}
+						literal += Normalize(integer);
+					} else {
+						return s.generate_error("expected number after .");
+					}
+				}
+				s.add_token_literal(NUMBER, literal);
+			} else if IsAlpha(char) {
+				s.current--;
+				literal, err := s.consume_identifier();
+				if err != nil {
+					return err;
+				}
+				s.add_token_literal(IDENTIFIER, literal);
+			} else {
+				return s.generate_error(fmt.Sprintf("NOTE: learn the fucking language idiot, got %v", char));
+			}
 		}
 	}
 	return nil;
@@ -270,6 +347,6 @@ func main() {
 		return;
 	}
 	for _, token := range tokens {
-		fmt.Printf("{\n    lexme: %s,\n}\n", string(token.Lexeme));
+		fmt.Printf("{\n    lexme: \"%s\",\n   literal: %v\n}\n", string(token.Lexeme), token.Literal);
 	}
 }
