@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strconv"
@@ -437,20 +438,39 @@ func main() {
 		fmt.Printf("usage: %s <file.amel>\n", os.Args[0]);
 		return;
 	}
-	filename := os.Args[1];
-	fbytes, err := os.ReadFile(filename);
-	if err != nil {
-		fmt.Println("could not read file", filename);
-		fmt.Println(err);
-		return;
-	}
-	scanner := NewScanner(filename, string(fbytes))
-	tokens, err := scanner.Scan();
-	if err != nil {
-		fmt.Println(err);
-		return;
-	}
-	for _, token := range tokens {
-		fmt.Printf("Token: {\n    lexme: \"%s\",\n   literal: %v\n    type: %s\n}\n", string(token.Lexeme), token.Literal, token.Type.ToString());
+	// filename := os.Args[1];
+	// fbytes, err := os.ReadFile(filename);
+	// if err != nil {
+	// 	fmt.Println("could not read file", filename);
+	// 	fmt.Println(err);
+	// 	return;
+	// }
+	// scanner := NewScanner(filename, string(fbytes));
+	// tokens, err := scanner.Scan();
+	// if err != nil {
+	// 	fmt.Println(err);
+	// 	return;
+	// }
+	// for _, token := range tokens {
+	// 	fmt.Printf("Token: {\n    lexme: \"%s\",\n   literal: %v\n    type: %s\n}\n", string(token.Lexeme), token.Literal, token.Type.ToString());
+	// }
+	reader:= bufio.NewReader(os.Stdin);
+	for {
+		fmt.Print(">> ");
+		str, err := reader.ReadString('\n');
+		if err != nil {
+			fmt.Println(err);
+			fmt.Println("Terminating REPL Process...");
+			break;
+		}
+		scanner := NewScanner("REPL", str);
+		tokens, err := scanner.Scan();
+		if err != nil {
+			fmt.Println(err);
+			continue;
+		}
+		for _, token := range tokens {
+			fmt.Printf("Token: {\n    lexme: \"%s\",\n   literal: %v\n    type: %s\n}\n", string(token.Lexeme), token.Literal, token.Type.ToString());
+		}
 	}
 }
