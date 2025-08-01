@@ -41,10 +41,10 @@ const (
 	CLASS
 	ELSE
 	FALSE
-	FUN
+	PROD	
 	FOR
 	IF
-	NIL
+	NULL
 	OR
 	PRINT
 	RETURN
@@ -57,9 +57,113 @@ const (
 	EOF
 );
 
+var keywords_map = map[string]TokenType {
+	"and": AND,
+	"class": CLASS,
+	"else": ELSE,
+	"prod": PROD,
+	"for": FOR,
+	"if": IF,
+	"null": NULL,
+	"or": OR,
+	"return": RETURN,
+	"super": SUPER,
+	"print": PRINT,
+	"this": THIS,
+	"true": TRUE,
+	"false": FALSE,
+	"var": VAR,
+	"while": WHILE,
+};
+
+func (tt TokenType) ToString() string {
+	switch tt {
+	case LEFT_PAREN:
+		return "LEFT_PAREN"
+	case RIGHT_PAREN:
+		return "RIGHT_PAREN"
+	case LEFT_BRACE:
+		return "LEFT_BRACE"
+	case RIGHT_BRACE:
+		return "RIGHT_BRACE"
+	case COMMA:
+		return "COMMA"
+	case DOT:
+		return "DOT"
+	case MINUS:
+		return "MINUS"
+	case PLUS:
+		return "PLUS"
+	case SEMICOLON:
+		return "SEMICOLON"
+	case SLASH:
+		return "SLASH"
+	case STAR:
+		return "STAR"
+	case BANG:
+		return "BANG"
+	case BANG_EQUAL:
+		return "BANG_EQUAL"
+	case EQUAL:
+		return "EQUAL"
+	case EQUAL_EQUAL:
+		return "EQUAL_EQUAL"
+	case GREATER:
+		return "GREATER"
+	case GREATER_EQUAL:
+		return "GREATER_EQUAL"
+	case LESS:
+		return "LESS"
+	case LESS_EQUAL:
+		return "LESS_EQUAL"
+	case IDENTIFIER:
+		return "IDENTIFIER"
+	case STRING:
+		return "STRING"
+	case NUMBER:
+		return "NUMBER"
+	case AND:
+		return "AND"
+	case CLASS:
+		return "CLASS"
+	case ELSE:
+		return "ELSE"
+	case FALSE:
+		return "FALSE"
+	case PROD:
+		return "PROD"
+	case FOR:
+		return "FOR"
+	case IF:
+		return "IF"
+	case NULL:
+		return "NULL"
+	case OR:
+		return "OR"
+	case PRINT:
+		return "PRINT"
+	case RETURN:
+		return "RETURN"
+	case SUPER:
+		return "SUPER"
+	case THIS:
+		return "THIS"
+	case TRUE:
+		return "TRUE"
+	case VAR:
+		return "VAR"
+	case WHILE:
+		return "WHILE"
+	case EOF:
+		return "EOF"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func IsAlpha(val rune) bool {
 	return 'a' <= val && val <= 'z' || 
-	       'A' <= val && val <= 'Z';
+	       'A' <= val && val <= 'Z' || val == '_';
 }
 
 func IsNum(val rune) bool {
@@ -76,10 +180,6 @@ func Normalize(val int) float64 {
 		fval /= 10;
 	}
 	return fval;
-}
-
-func (tt TokenType) ToString() string {
-	return "TODO";
 }
 
 type Token struct {
@@ -309,7 +409,11 @@ func (s *Scanner) scan_curr() error {
 				if err != nil {
 					return err;
 				}
-				s.add_token_literal(IDENTIFIER, literal);
+				tt := IDENTIFIER;
+				if keyword, pres := keywords_map[literal]; pres {
+					tt = keyword;
+				}
+				s.add_token_literal(tt, literal);
 			} else {
 				return s.generate_error(fmt.Sprintf("NOTE: learn the fucking language idiot, got %v", char));
 			}
@@ -347,6 +451,6 @@ func main() {
 		return;
 	}
 	for _, token := range tokens {
-		fmt.Printf("{\n    lexme: \"%s\",\n   literal: %v\n}\n", string(token.Lexeme), token.Literal);
+		fmt.Printf("Token: {\n    lexme: \"%s\",\n   literal: %v\n    type: %s\n}\n", string(token.Lexeme), token.Literal, token.Type.ToString());
 	}
 }
