@@ -32,6 +32,8 @@ const (
 	SEMICOLON
 	SLASH
 	STAR
+	QUESTION
+	COLON
 
 	// One or two character tokens.
 	BANG
@@ -113,6 +115,10 @@ func (tt TokenType) ToString() string {
 		return "SLASH"
 	case STAR:
 		return "STAR"
+	case QUESTION:
+		return "QUESTION"
+	case COLON:
+		return "COLON"
 	case BANG:
 		return "BANG"
 	case BANG_EQUAL:
@@ -297,6 +303,8 @@ func (s *Scanner) scan_curr() error {
 		case '+': { s.add_token(PLUS); break; }
 		case ';': { s.add_token(SEMICOLON); break; }
 		case '*': { s.add_token(STAR); break; }
+		case '?': { s.add_token(QUESTION); break; }
+		case ':': { s.add_token(COLON); break; }
 		case '!': {
 			tt := BANG;
 			if s.expect_rune('=') {

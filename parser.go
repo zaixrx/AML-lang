@@ -1,9 +1,23 @@
+// TODO: support non-cascaded error handling and syntax error recovery
+// in case of entering panic mode (to resume parsing other tokens)
+
+// TODO: Add error productions to handle each binary operator appearing without a left-hand operand. 
+// aka: detect a binary operator appearing at the beginning of an expression.
+// Report that as an error, but also parse and discard a right-hand operand with the "appropriate precedence".
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Expr interface {
-	implement();
+	String() string;
+};
+type TernaryExpr struct {
+	cond Expr;
+	truthy Expr;
+	falsy Expr;
 };
 type BinaryExpr struct {
 	left  Expr
@@ -17,9 +31,38 @@ type UnaryExpr struct {
 type LiteralExpr struct {
 	value any;
 }
-func (bin *BinaryExpr) implement() {}
-func (un *UnaryExpr) implement() {}
-func (lit *LiteralExpr) implement() {}
+func (tir *TernaryExpr) String() string {
+	var b strings.Builder;
+	fmt.Fprintf(&b, "[ cond: %s ", tir.cond.String());
+	fmt.Fprintf(&b, "truthy: %s ", tir.truthy.String());
+	fmt.Fprintf(&b, "falsy: %s ", tir.falsy.String());
+	fmt.Fprint(&b, "]");
+	return b.String();
+}
+func (bin *BinaryExpr) String() string {
+	var b strings.Builder;
+	fmt.Fprintf(&b, "[ %s ", bin.operator.String());
+	if bin.left != nil {
+		fmt.Fprintf(&b, "left: %s ", bin.left.String());
+	}
+	if bin.right != nil {
+		fmt.Fprintf(&b, "right: %s ", bin.right.String());
+	}
+	fmt.Fprint(&b, "]");
+	return b.String();
+}
+func (un *UnaryExpr) String() string {
+	var b strings.Builder;
+	fmt.Fprintf(&b, "[ %s ", un.operator.String());
+	if un.operand != nil {
+		fmt.Fprintf(&b, "left: %s ", un.operand.String());
+	}
+	fmt.Fprint(&b, "]");
+	return b.String();
+}
+func (lit *LiteralExpr) String() string {
+	return fmt.Sprintf("%v", lit.value);
+}
 
 type Parser struct {
 	current int;
@@ -56,10 +99,59 @@ func (p *Parser) expect(tts ...TokenType) bool {
 
 // expression -> equality
 func (p *Parser) expression() (Expr, error) {
-	return p.equality();
+	return p.ternary();
 }
 
-// equality   -> comparison (("!=" | "==") comparison)*
+// ternay -> equality "?" expressions ":" ternary;
+// example: (a > 0) ? a, b, c : (b > 0 ? c, b, a : b);
+func (p *Parser) ternary() (Expr, error) {
+	expr, err := p.expressions();
+	if err != nil {
+		return nil, err;
+	}
+	if p.expect(QUESTION) {
+		truthy, err := p.expressions();
+		if err != nil {
+			return nil, err;
+		}
+		if !p.expect(COLON) {
+			return nil, p.generate_expect_error("':' in ternay operator");
+		}
+		falsy, err := p.ternary();
+		if err != nil {
+			return nil, err;
+		}
+		return &TernaryExpr{
+			cond: expr,
+			truthy: truthy,
+			falsy: falsy,
+		}, nil;
+	}
+	return expr, nil;
+}
+
+// expressions -> equality "," equality
+func (p *Parser) expressions() (Expr, error) {
+	expr, err := p.equality();
+	if err != nil {
+		return nil, err;
+	}
+	if p.expect(COMMA) {
+		operator := p.prev();
+		exprs, err := p.equality();
+		if err != nil {
+			return nil, err;
+		}
+		return &BinaryExpr{
+			left: expr,
+			operator: operator,
+			right: exprs,
+		}, nil;
+	}
+	return expr, nil;
+}
+
+// equality -> comparison (("!=" | "==") comparison)*
 func (p *Parser) equality() (Expr, error) {
 	expr, err := p.comparison();
 	if err != nil {
@@ -173,7 +265,7 @@ func (p *Parser) primary() (Expr, error) {
 		return &LiteralExpr{
 			value: nil,
 		}, nil
-	} else if p.expect(STRING, NUMBER) {
+	} else if p.expect(IDENTIFIER, STRING, NUMBER) {
 		return &LiteralExpr {
 			value: p.prev().Lexeme,
 		}, nil
@@ -191,7 +283,7 @@ func (p *Parser) primary() (Expr, error) {
 }
 
 func (p *Parser) generate_expect_error(expected string) error {
-	return fmt.Errorf("Parser Error: expected %s got %s\n", expected, string(p.tokens[p.current].Lexeme));
+	return fmt.Errorf("Parser Error: expected %s\n", expected);
 }
 
 func (p *Parser) Parse() ([]Expr, error) {
@@ -200,6 +292,9 @@ func (p *Parser) Parse() ([]Expr, error) {
 		expr, err := p.expression();
 		if err != nil {
 			return nil, err;
+		}
+		if !p.expect(SEMICOLON) {
+			return nil, p.generate_expect_error(";");
 		}
 		exprs = append(exprs, expr);
 	}

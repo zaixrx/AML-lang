@@ -7,10 +7,6 @@ import (
 )
 
 func main() {
-	if (len(os.Args) != 2) {
-		fmt.Printf("usage: %s <file.aml>\n", os.Args[0]);
-		return;
-	}
 	reader:= bufio.NewReader(os.Stdin);
 	for {
 		fmt.Print(">> ");
@@ -26,8 +22,14 @@ func main() {
 			fmt.Println(err);
 			continue;
 		}
-		for _, token := range tokens {
-			fmt.Printf("Token: {\n    lexme: \"%s\",\n   literal: %v\n    type: %s\n}\n", string(token.Lexeme), token.Literal, token.Type.ToString());
+		parser := NewParser(tokens);
+		asts, err := parser.Parse();
+		if err != nil {
+			fmt.Println(err);
+			continue;
+		}
+		for _, ast := range asts {
+			fmt.Println(ast.String());
 		}
 	}
 }
