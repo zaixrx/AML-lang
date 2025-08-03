@@ -1,0 +1,59 @@
+public interface Visitor<T> {
+	T visit_unary(Expr);
+	T visit_binary(Expr);
+	T visit_trenary(Expr);
+	T visit_group(Expr);
+	T visit_litreal(Expr);
+};
+
+public class Interpreter : Visitor<Object> {
+ 	public Object visit_unary(Expr.Unary expr) throws InterpreterException { }
+ 	public Object visit_binary(Expr.Binary) throws InterpreterException { }
+ 	public Object visit_tirnary(Expr.Tirnary) throws InterpreterException { }
+ 	public Object visit_group(Expr.Group) throws InterpreterException { }
+ 	public Object visit_litreal(Expr.Literal) throws InterpreterException { }
+
+	public List<Object> Interpret(List<Expr> exprs) throws InterpreterException {
+		infer objects = new List<Object>();
+		foreach (infer expr in exprs) {
+			objects.Append(expr.visit(this));
+		}
+		return objects ;
+	}
+};
+
+public class Expr {
+	virtural T visit<T>(Visitor<T> visitor);
+
+	public class Unary : Expr {
+		internal_state;
+		override T visit<T>(Visitor<T> visitor) {
+			return visitor.visit_unary(this);
+		}
+	};
+	public class Binary : Expr {
+		internal_state;
+		override T visit(Visitor<T> visitor) {
+			return visitor.visit_binary(this);
+		}
+	};
+	public class Tirnay : Expr {
+		internal_state;
+		override T visit(Visitor<T> visitor) {
+			return visitor.visit_tirnary(this);
+		}
+	};
+	public class Group : Expr {
+		internal_state;
+		override T visit(Visitor<T> visitor) {
+			return visitor.visit_group(this);
+		}
+	};
+	public class Literal : Expr {
+		internal_state;
+		override T visit(Visitor<T> visitor) {
+			return visitor.visit_litreal(this);
+		}
+	};
+};
+

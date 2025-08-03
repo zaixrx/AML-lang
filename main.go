@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
 	"os"
+	"fmt"
+	"bufio"
 )
 
 func main() {
@@ -28,8 +28,14 @@ func main() {
 			fmt.Println(err);
 			continue;
 		}
-		for _, ast := range asts {
-			fmt.Println(ast.String());
+		interpreter := Interpreter{};
+		values, err := interpreter.Interpret(asts);
+		if err != nil {
+			fmt.Println(err);
+			continue;
+		}
+		for _, value := range values {
+			fmt.Printf("%#v\n", value);
 		}
 	}
 }

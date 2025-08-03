@@ -271,7 +271,6 @@ func (s *Scanner) consume_string() (string, error) {
 
 func (s *Scanner) consume_integer() (int, error) {
 	for r := s.peek_rune(); IsNum(r) && r != EOF_RUNE; r = s.peek_rune() {
-		fmt.Println(string(r), s.start, s.current);
 		s.consume_rune();
 	}
 	literal, err := strconv.Atoi(string(s.source[s.start:s.current]));

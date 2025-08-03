@@ -1,19 +1,5 @@
 package main
 
-import "fmt";
-
-type Bool bool
-func (b Bool) String() string { return fmt.Sprintf("%t", b) }
-
-type Number float64
-func (n Number) String() string { return fmt.Sprintf("%g", n) }
-
-type Str string
-func (s Str) String() string { return string(s) }
-
-type Null struct{}
-func (n Null) String() string { return "null" }
-
 func IsAlpha(val rune) bool {
 	return 'a' <= val && val <= 'z' || 
 	       'A' <= val && val <= 'Z' || val == '_';

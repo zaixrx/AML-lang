@@ -3,7 +3,7 @@
 
 // TODO: Add error productions to handle each binary operator appearing without a left-hand operand. 
 // aka: detect a binary operator appearing at the beginning of an expression.
-// Report that as an error, but also parse and discard a right-hand operand with the "appropriate precedence".
+// Report that as an error, but also parse and discard a right-hand operand with the appropriate precedence.
 package main
 
 import (
@@ -13,31 +13,34 @@ import (
 
 type Expr interface {
 	String() string;
+	// TODO: find a workaround for the Visitor pattern with go generics
+	AcceptInterpreter(Interpreter) (Value, error);
 };
+
 type TernaryExpr struct {
 	cond Expr;
-	truthy Expr;
-	falsy Expr;
+	iftrue Expr;
+	iffalse Expr;
 };
+func (ter *TernaryExpr) AcceptInterpreter(in Interpreter) (Value, error) {
+	return in.visit_ternary(ter);
+}
+func (ter *TernaryExpr) String() string {
+	var b strings.Builder;
+	fmt.Fprintf(&b, "[ cond: %s ", ter.cond.String());
+	fmt.Fprintf(&b, "iftrue: %s ", ter.iftrue.String());
+	fmt.Fprintf(&b, "iffalse: %s ", ter.iffalse.String());
+	fmt.Fprint(&b, "]");
+	return b.String();
+}
+
 type BinaryExpr struct {
 	left  Expr
 	operator *Token
 	right Expr	
 };
-type UnaryExpr struct {
-	operand Expr
-	operator *Token
-};
-type LiteralExpr struct {
-	value any;
-}
-func (tir *TernaryExpr) String() string {
-	var b strings.Builder;
-	fmt.Fprintf(&b, "[ cond: %s ", tir.cond.String());
-	fmt.Fprintf(&b, "truthy: %s ", tir.truthy.String());
-	fmt.Fprintf(&b, "falsy: %s ", tir.falsy.String());
-	fmt.Fprint(&b, "]");
-	return b.String();
+func (bin *BinaryExpr) AcceptInterpreter(in Interpreter) (Value, error) {
+	return in.visit_binary(bin);
 }
 func (bin *BinaryExpr) String() string {
 	var b strings.Builder;
@@ -51,6 +54,14 @@ func (bin *BinaryExpr) String() string {
 	fmt.Fprint(&b, "]");
 	return b.String();
 }
+
+type UnaryExpr struct {
+	operand Expr
+	operator *Token
+};
+func (un *UnaryExpr) AcceptInterpreter(in Interpreter) (Value, error) {
+	return in.visit_unary(un);
+}
 func (un *UnaryExpr) String() string {
 	var b strings.Builder;
 	fmt.Fprintf(&b, "[ %s ", un.operator.String());
@@ -60,8 +71,25 @@ func (un *UnaryExpr) String() string {
 	fmt.Fprint(&b, "]");
 	return b.String();
 }
+
+type LiteralExpr struct {
+	value any;
+}
+func (lit *LiteralExpr) AcceptInterpreter(in Interpreter) (Value, error) {
+	return in.visit_literal(lit);
+}
 func (lit *LiteralExpr) String() string {
 	return fmt.Sprintf("%v", lit.value);
+}
+
+type GroupingExpr struct {
+	expr Expr
+}
+func (grp *GroupingExpr) AcceptInterpreter(in Interpreter) (Value, error) {
+	return in.visit_group(grp);
+}
+func (grp *GroupingExpr) String() string {
+	return grp.expr.String();
 }
 
 type Parser struct {
@@ -110,21 +138,21 @@ func (p *Parser) ternary() (Expr, error) {
 		return nil, err;
 	}
 	if p.expect(QUESTION) {
-		truthy, err := p.expressions();
+		iftrue, err := p.expressions();
 		if err != nil {
 			return nil, err;
 		}
 		if !p.expect(COLON) {
 			return nil, p.generate_expect_error("':' in ternay operator");
 		}
-		falsy, err := p.ternary();
+		iffalse, err := p.ternary();
 		if err != nil {
 			return nil, err;
 		}
 		return &TernaryExpr{
 			cond: expr,
-			truthy: truthy,
-			falsy: falsy,
+			iftrue: iftrue,
+			iffalse: iffalse,
 		}, nil;
 	}
 	return expr, nil;
@@ -267,7 +295,7 @@ func (p *Parser) primary() (Expr, error) {
 		}, nil
 	} else if p.expect(IDENTIFIER, STRING, NUMBER) {
 		return &LiteralExpr {
-			value: p.prev().Lexeme,
+			value: p.prev().Literal,
 		}, nil
 	} else if p.expect(LEFT_PAREN) {
 		expr, err := p.expression();
@@ -275,7 +303,9 @@ func (p *Parser) primary() (Expr, error) {
 			return nil, err;
 		}
 		if p.expect(RIGHT_PAREN) {
-			return expr, nil;
+			return &GroupingExpr{
+				expr: expr,
+			}, nil;
 		}
 		return nil, p.generate_expect_error(")");
 	}
@@ -293,9 +323,9 @@ func (p *Parser) Parse() ([]Expr, error) {
 		if err != nil {
 			return nil, err;
 		}
-		if !p.expect(SEMICOLON) {
-			return nil, p.generate_expect_error(";");
-		}
+		// if !p.expect(SEMICOLON) {
+		// 	return nil, p.generate_expect_error(";");
+		// }
 		exprs = append(exprs, expr);
 	}
 	return exprs, nil;
