@@ -11,30 +11,19 @@ import (
 	"aml/interpreter"
 )
 
-func evalAML(filename string, content string) {
+func evalAML(interpreter *interpreter.Interpreter, filename string, content string) {
 	scanner := lexer.NewScanner(filename, content);
 	tokens, err := scanner.Scan();
 	if err != nil {
 		fmt.Println(err);
 		return;
 	}
-	
-	for _, token := range tokens {
-		fmt.Println(token);
-	}
-	
 	parser := parser.NewParser(tokens);
 	stmts, err := parser.Parse();
 	if err != nil {
 		fmt.Println(err);
 		return;
 	}
-
-	for _, stmt := range stmts {
-		fmt.Println(stmt);
-	}
-
-	interpreter := interpreter.Interpreter{};
 	err = interpreter.Interpret(stmts);
 	if err != nil {
 		fmt.Println(err);
@@ -44,6 +33,7 @@ func evalAML(filename string, content string) {
 
 func handleREPL() {
 	reader := bufio.NewReader(os.Stdin);
+	interpreter := interpreter.NewInterpreter(); 
 	for {
 		fmt.Print(">> ");
 		code, err := reader.ReadString('\n');
@@ -52,7 +42,7 @@ func handleREPL() {
 			fmt.Println("Terminating REPL Process...");
 			break;
 		}
-		evalAML("REPL", code);
+		evalAML(&interpreter, "REPL", code);
 	}
 }
 
@@ -61,7 +51,8 @@ func handleFile(filename string) error {
 	if err != nil {
 		return err;
 	}
-	evalAML(filename, string(bcode));
+	interpreter := interpreter.NewInterpreter();
+	evalAML(&interpreter, filename, string(bcode));
 	return nil;
 }
 

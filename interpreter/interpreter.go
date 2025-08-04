@@ -8,7 +8,7 @@ import (
 );
 
 type Interpreter struct {
-	variables map[string]parser.Value;
+	environment map[string]parser.Value;
 };
 
 func (in Interpreter) generate_error(format string, args ...any) error {
@@ -45,6 +45,8 @@ func (in Interpreter) extract_numbers(values ...parser.Value) (bool, []float64) 
 func (in Interpreter) equal(a parser.Value, b parser.Value) bool {
 	return reflect.ValueOf(a).Equal(reflect.ValueOf(b));
 }
+
+// expressions
 
 func (in Interpreter) VisitUnary(expr *parser.UnaryExpr) (parser.Value, error) {
 	value, err := expr.Operand.Accept(in);
@@ -175,25 +177,35 @@ func (in Interpreter) VisitLiteral(expr *parser.LiteralExpr) (parser.Value, erro
 	return expr.ValueLiteral, nil;
 }
 
+func (in Interpreter) VisitVariable(expr *parser.VariableExpr) (parser.Value, error) {
+	name := string(expr.Name.Lexeme);
+	value, exist := in.environment[name];
+	if !exist {
+		return nil, in.generate_error("variable %s is not declared", name);
+	}
+	return value, nil;
+}
+
 func (in Interpreter) VisitAssign(expr *parser.AssignExpr) (parser.Value, error) {
-	if _, pres := in.variables[expr.To]; !pres { 
+	if _, pres := in.environment[expr.To]; !pres { 
 		return nil, in.generate_error("variable of name '%s' isn't declared!", expr.To);
 	}
 	value, err := expr.From.Accept(in);
 	if err != nil {
 		return nil, err;
 	}
-	in.variables[expr.To] = value;
+	in.environment[expr.To] = value;
 	return value, nil;
 }
 
+// statements
 func (in Interpreter) VisitExpr(stmt *parser.ExprStmt) error {
 	_, err := stmt.InnerExpr.Accept(in);
 	return err;
 }
 
 func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) error {
-	_, exist := in.variables[stmt.Name];
+	_, exist := in.environment[stmt.Name];
 	if exist {
 		return in.generate_error("variable %s is already declared", stmt.Name);
 	}
@@ -201,7 +213,7 @@ func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) 
 	if err != nil {
 		return err;
 	}
-	in.variables[stmt.Name] = value;
+	in.environment[stmt.Name] = value;
 	return nil;
 }
 
@@ -210,7 +222,7 @@ func (in Interpreter) VisitPrint(stmt *parser.PrintStmt) error {
 	if err != nil {
 		return err;
 	}
-	fmt.Printf("%#v\n", val);
+	fmt.Printf("%v\n", val);
 	return nil;
 }
 
@@ -218,10 +230,13 @@ func (in Interpreter) exec(stmt parser.Stmt) error {
 	return stmt.Accept(in);
 }
 
+func NewInterpreter() Interpreter {
+	return Interpreter {
+		environment: make(map[string]parser.Value),
+	};
+}
+
 func (in Interpreter) Interpret(stmts []parser.Stmt) error {
-	if in.variables == nil {
-		in.variables = make(map[string]parser.Value, 0);
-	}
 	for _, stmt := range stmts {
 		err := in.exec(stmt);
 		if err != nil {

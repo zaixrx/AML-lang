@@ -8,6 +8,7 @@ type ExprVisitor interface {
 	VisitBinary(*BinaryExpr) (Value, error);
 	VisitUnary(*UnaryExpr) (Value, error);
 	VisitLiteral(*LiteralExpr) (Value, error);
+	VisitVariable(*VariableExpr) (Value, error);
 	VisitGroup(*GroupingExpr) (Value, error);
 	VisitAssign(*AssignExpr) (Value, error);
 }
@@ -37,6 +38,10 @@ type LiteralExpr struct {
 	ValueLiteral Value;
 };
 
+type VariableExpr struct {
+	Name *lexer.Token;
+};
+
 type GroupingExpr struct {
 	InnerExpr Expr
 };
@@ -60,6 +65,10 @@ func (un *UnaryExpr) Accept(vis ExprVisitor) (Value, error) {
 
 func (lit *LiteralExpr) Accept(vis ExprVisitor) (Value, error) {
 	return vis.VisitLiteral(lit);
+}
+
+func (vari *VariableExpr) Accept(vis ExprVisitor) (Value, error) {
+	return vis.VisitVariable(vari);
 }
 
 func (grp *GroupingExpr) Accept(vis ExprVisitor) (Value, error) {

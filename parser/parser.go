@@ -46,6 +46,18 @@ func (p *Parser) expect(tts ...lexer.TokenType) bool {
 	return false;
 }
 
+func (p *Parser) expect_serie(tts ...lexer.TokenType) []*lexer.Token {
+	if p.eof(uint(len(tts))) {
+		return nil;
+	}
+	for i, tt := range tts {
+		if token := p.tokens[p.current + i]; token.Type != tt {
+			return nil;
+		}
+	}
+	return p.tokens[p.current:p.current+len(tts)];
+}
+
 func (p *Parser) declarestmt() (Stmt, error) {
 	if p.expect(lexer.VAR) {
 		if !p.expect(lexer.IDENTIFIER) {
@@ -126,17 +138,13 @@ func (p *Parser) expressions() (Expr, error) {
 }
 
 func (p *Parser) assign() (Expr, error) {
-	if p.expect(lexer.IDENTIFIER) {
-		id := p.prev();
-		if !p.expect(lexer.EQUAL) {
-			return nil, p.generate_expect_error("'=' after IDENTIFIER in assignment");
-		}
+	if s := p.expect_serie(lexer.IDENTIFIER, lexer.EQUAL); s != nil {
 		src, err := p.ternary();
 		if err != nil {
 			return nil, err;
 		}
 		return &AssignExpr{
-			To: string(id.Lexeme),
+			To: string(s[0].Lexeme),
 			From: src,
 		}, nil;
 	}
@@ -285,10 +293,14 @@ func (p *Parser) primary() (Expr, error) {
 		return &LiteralExpr{
 			ValueLiteral: nil,
 		}, nil
-	} else if p.expect(lexer.IDENTIFIER, lexer.STRING, lexer.NUMBER) {
+	} else if p.expect(lexer.STRING, lexer.NUMBER) {
 		return &LiteralExpr {
 			ValueLiteral: p.prev().Literal,
 		}, nil
+	} else if p.expect(lexer.IDENTIFIER) {
+		return &VariableExpr{
+			Name: p.prev(),
+		}, nil;
 	} else if p.expect(lexer.LEFT_PAREN) {
 		expr, err := p.expression();
 		if err != nil {
