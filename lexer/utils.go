@@ -1,4 +1,4 @@
-package main
+package lexer
 
 func IsAlpha(val rune) bool {
 	return 'a' <= val && val <= 'z' || 
