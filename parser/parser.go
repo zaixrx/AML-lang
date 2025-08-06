@@ -1,14 +1,14 @@
 // TODO: support non-cascaded error handling and syntax error recovery
 // in case of entering panic mode (to resume parsing other tokens)
 
-// TODO: Add error productions to handle each binary operator appearing without a left-hand operand. 
+// TODO: Add error productions to handle each binary operator appearing without a left-hand operand.
 // aka: detect a binary operator appearing at the beginning of an expression.
 // Report that as an error, but also parse and discard a right-hand operand with the appropriate precedence.
 package parser
 
 import (
-	"fmt"
 	"aml/lexer"
+	"fmt"
 )
 
 type Value = any;
@@ -55,7 +55,11 @@ func (p *Parser) expect_serie(tts ...lexer.TokenType) []*lexer.Token {
 			return nil;
 		}
 	}
-	return p.tokens[p.current:p.current+len(tts)];
+	// TODO: remove this
+	serie := make([]*lexer.Token, len(tts));
+	copy(serie, p.tokens[p.current:p.current+len(tts)]);
+	p.current += len(tts);
+	return serie;
 }
 
 func (p *Parser) declarestmt() (Stmt, error) {
@@ -79,6 +83,28 @@ func (p *Parser) declarestmt() (Stmt, error) {
 			Asset: target,
 		}, nil;
 	}
+	return p.statement();
+}
+
+func (p *Parser) statement() (Stmt, error) {
+	return p.blockstmt();
+}
+
+// block -> "{" declarestmt* "}"
+func (p *Parser) blockstmt() (Stmt, error) {
+	if p.expect(lexer.LEFT_BRACE) {
+		stmts := make([]Stmt, 0);
+		for !p.expect(lexer.RIGHT_BRACE) {
+			stmt, err := p.declarestmt();
+			if err != nil {
+				return nil, err;
+			}
+			stmts = append(stmts, stmt);
+		}
+		return &BlockStmt{
+			Stmts: stmts,
+		}, nil;
+	}
 	return p.printstmt();
 }
 
@@ -95,10 +121,10 @@ func (p *Parser) printstmt() (Stmt, error) {
 			Asset: expr,
 		}, nil;
 	}
-	return p.statement();
+	return p.exprstmt();
 }
 
-func (p *Parser) statement() (Stmt, error) {
+func (p *Parser) exprstmt() (Stmt, error) {
 	expr, err := p.expression();
 	if err != nil {
 		return nil, err;
@@ -138,14 +164,14 @@ func (p *Parser) expressions() (Expr, error) {
 }
 
 func (p *Parser) assign() (Expr, error) {
-	if s := p.expect_serie(lexer.IDENTIFIER, lexer.EQUAL); s != nil {
-		src, err := p.ternary();
+	if tokens := p.expect_serie(lexer.IDENTIFIER, lexer.EQUAL); tokens != nil {
+		src, err := p.assign();
 		if err != nil {
 			return nil, err;
 		}
 		return &AssignExpr{
-			To: string(s[0].Lexeme),
-			From: src,
+			Name: string(tokens[0].Lexeme),
+			Asset: src,
 		}, nil;
 	}
 	return p.ternary();

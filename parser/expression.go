@@ -47,8 +47,8 @@ type GroupingExpr struct {
 };
 
 type AssignExpr struct {
-	To string;
-	From Expr;
+	Name string;
+	Asset Expr;
 };
 
 func (ter *TernaryExpr) Accept(vis ExprVisitor) (Value, error) {

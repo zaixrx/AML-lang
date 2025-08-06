@@ -18,6 +18,9 @@ func evalAML(interpreter *interpreter.Interpreter, filename string, content stri
 		fmt.Println(err);
 		return;
 	}
+	// for _, token := range tokens {
+	// 	fmt.Println(token);
+	// }
 	parser := parser.NewParser(tokens);
 	stmts, err := parser.Parse();
 	if err != nil {

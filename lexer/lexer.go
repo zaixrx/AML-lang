@@ -94,15 +94,20 @@ func (s *Scanner) consume_string() (string, error) {
 	return string(s.source[s.start:s.current]), nil
 }
 
-func (s *Scanner) consume_integer() (int, error) {
+func (s *Scanner) consume_number() (float64, error) {
 	for r := s.peek_rune(); IsNum(r) && r != EOF_RUNE; r = s.peek_rune() {
 		s.consume_rune();
 	}
-	literal, err := strconv.Atoi(string(s.source[s.start:s.current]));
+	if s.expect_rune('.') {
+		for r := s.peek_rune(); IsNum(r) && r != EOF_RUNE; r = s.peek_rune() {
+			s.consume_rune();
+		}
+	}
+	num, err := strconv.ParseFloat(string(s.source[s.start:s.current]), 64);
 	if err != nil {
 		return 0, s.generate_error(err.Error());
 	}
-	return literal, nil
+	return num, nil
 }
 
 func (s *Scanner) consume_identifier() (string, error) {
@@ -192,28 +197,11 @@ func (s *Scanner) scan_curr() error {
 		default: {
 			if IsNum(char) {
 				s.current--;
-				var literal float64 = 0.0;
-				integer, err := s.consume_integer();
+				num, err := s.consume_number();
 				if err != nil {
 					return err;
 				}
-				literal += float64(integer);
-				if (s.peek_rune() == '.') {
-					s.consume_rune();
-					if IsNum(s.peek_rune()) {
-						rollback := s.start;
-						s.start = s.current;
-						integer, err = s.consume_integer();
-						s.start = rollback;
-						if err != nil {
-							return err;
-						}
-						literal += Normalize(integer);
-					} else {
-						return s.generate_error("expected number after .");
-					}
-				}
-				s.add_token_literal(NUMBER, literal);
+				s.add_token_literal(NUMBER, num);
 			} else if IsAlpha(char) {
 				s.current--;
 				literal, err := s.consume_identifier();

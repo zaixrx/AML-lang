@@ -7,8 +7,51 @@ import (
 	"aml/parser"
 );
 
+type Environment struct {
+	vars map[string]parser.Value;
+	prev *Environment;
+};
+
+func NewEnvironment() *Environment {
+	return &Environment{
+		vars: make(map[string]parser.Value),
+		prev: nil,
+	};
+}
+
+func (env *Environment) get(name string) (parser.Value, error) {
+	curr := env;
+	for curr != nil {
+		if value, exists := curr.vars[name]; exists {
+			return value, nil;
+		}
+		curr = curr.prev;
+	}
+	return nil, fmt.Errorf("variable %s is not declared", name);
+}
+
+func (env *Environment) declare(name string, initial_value parser.Value) error {
+	if _, exists := env.vars[name]; exists {
+		return fmt.Errorf("variable %s is already declared", name);
+	}
+	env.vars[name] = initial_value;
+	return nil;
+}
+
+func (env *Environment) assign(name string, new_value parser.Value) error {
+	curr := env;
+	for curr != nil {
+		if _, exists := curr.vars[name]; exists {
+			curr.vars[name] = new_value;
+			return nil;
+		}
+		curr = curr.prev;
+	}
+	return fmt.Errorf("variable %s is not declared", name);
+}
+
 type Interpreter struct {
-	environment map[string]parser.Value;
+	environment *Environment;
 };
 
 func (in Interpreter) generate_error(format string, args ...any) error {
@@ -24,7 +67,6 @@ func (in Interpreter) extract_boolean(value parser.Value) bool {
 
 func (in Interpreter) extract_number(value parser.Value) (bool, float64) {
 	if reflect.TypeOf(value).Kind() != reflect.Float64 {
-		fmt.Println("not a float", reflect.TypeOf(value), value);
 		return false, 0;
 	}
 	return true, reflect.ValueOf(value).Float();
@@ -68,6 +110,10 @@ func (in Interpreter) VisitUnary(expr *parser.UnaryExpr) (parser.Value, error) {
 	return nil, in.generate_error("invalid unary operation, got %s", expr.Operator.Type.ToString());
 }
 
+func (in Interpreter) stringify(value parser.Value) string {
+	return fmt.Sprint(value);
+}
+
 func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error) {
 	leftval, err := expr.LOperand.Accept(in);
 	if err != nil {
@@ -79,11 +125,16 @@ func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error)
 	}
 	switch expr.Operator.Type {
 		case lexer.PLUS: {
-			succ, nums := in.extract_numbers(leftval, rightval);
-			if !succ {
-				return nil, in.generate_error("operands in binary '+' must be numbers");
+			if reflect.TypeOf(leftval).Kind() == reflect.Float64 {
+				succ, nums := in.extract_numbers(leftval, rightval);
+				if !succ {
+					return nil, in.generate_error("operands in binary '+' must be numbers");
+				}
+				return nums[0] + nums[1], nil;
+			} else if reflect.TypeOf(leftval).Kind() == reflect.String {
+				return string(in.stringify(leftval) + in.stringify(rightval)), nil;
 			}
-			return nums[0] + nums[1], nil;
+			return nil, in.generate_error("operands in binary '+' must be strings or numbers");
 		};
 		case lexer.MINUS: {
 			succ, nums := in.extract_numbers(leftval, rightval);
@@ -178,23 +229,22 @@ func (in Interpreter) VisitLiteral(expr *parser.LiteralExpr) (parser.Value, erro
 }
 
 func (in Interpreter) VisitVariable(expr *parser.VariableExpr) (parser.Value, error) {
-	name := string(expr.Name.Lexeme);
-	value, exist := in.environment[name];
-	if !exist {
-		return nil, in.generate_error("variable %s is not declared", name);
+	value, err := in.environment.get(string(expr.Name.Lexeme));
+	if err != nil {
+		return nil, in.generate_error("%s", err.Error());
 	}
 	return value, nil;
 }
 
 func (in Interpreter) VisitAssign(expr *parser.AssignExpr) (parser.Value, error) {
-	if _, pres := in.environment[expr.To]; !pres { 
-		return nil, in.generate_error("variable of name '%s' isn't declared!", expr.To);
-	}
-	value, err := expr.From.Accept(in);
+	value, err := expr.Asset.Accept(in);
 	if err != nil {
 		return nil, err;
 	}
-	in.environment[expr.To] = value;
+	err = in.environment.assign(expr.Name, value);
+	if err != nil {
+		return nil, in.generate_error("%s", err.Error());
+	}
 	return value, nil;
 }
 
@@ -205,15 +255,14 @@ func (in Interpreter) VisitExpr(stmt *parser.ExprStmt) error {
 }
 
 func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) error {
-	_, exist := in.environment[stmt.Name];
-	if exist {
-		return in.generate_error("variable %s is already declared", stmt.Name);
-	}
-	value, err := stmt.Asset.Accept(in);
+	initial_value, err := stmt.Asset.Accept(in);
 	if err != nil {
 		return err;
 	}
-	in.environment[stmt.Name] = value;
+	err = in.environment.declare(stmt.Name, initial_value);
+	if err != nil {
+		return in.generate_error("%s", err.Error());
+	}
 	return nil;
 }
 
@@ -226,13 +275,31 @@ func (in Interpreter) VisitPrint(stmt *parser.PrintStmt) error {
 	return nil;
 }
 
+func (in Interpreter) VisitBlock(block *parser.BlockStmt) error {
+	var err error = nil;
+	// create new environment
+	env := NewEnvironment();
+	env.prev = in.environment;
+	in.environment = env;
+	// execute all environment statements
+	for _, stmt := range block.Stmts {
+		err = stmt.Accept(in);
+		if err != nil {
+			break;
+		}
+	}
+	// return to old environment
+	in.environment = in.environment.prev;
+	return err;
+}
+
 func (in Interpreter) exec(stmt parser.Stmt) error {
 	return stmt.Accept(in);
 }
 
 func NewInterpreter() Interpreter {
 	return Interpreter {
-		environment: make(map[string]parser.Value),
+		environment: NewEnvironment(),
 	};
 }
 

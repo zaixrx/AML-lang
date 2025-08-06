@@ -5,6 +5,7 @@ type StmtVisitor interface {
 	VisitExpr(*ExprStmt) error;
 	VisitVariableDeclaration(*VarDeclarationStmt)  error;
 	VisitPrint(*PrintStmt) error;
+	VisitBlock(*BlockStmt) error;
 }
 
 type Stmt interface { 
@@ -24,6 +25,12 @@ type PrintStmt struct {
 	Asset Expr;
 }
 
+type BlockStmt struct {
+	Stmts []Stmt;	
+}
+
+type Statmetsd struct {};
+
 func (stmt *ExprStmt) Accept(vis StmtVisitor) error {
 	return vis.VisitExpr(stmt);
 }
@@ -34,4 +41,8 @@ func (stmt *VarDeclarationStmt) Accept(vis StmtVisitor) error {
 
 func (stmt *PrintStmt) Accept(in StmtVisitor) error {
 	return in.VisitPrint(stmt);
+}
+
+func (stmt *BlockStmt) Accept(in StmtVisitor) error {
+	return in.VisitBlock(stmt);
 }
