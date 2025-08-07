@@ -11,6 +11,7 @@ type ExprVisitor interface {
 	VisitVariable(*VariableExpr) (Value, error);
 	VisitGroup(*GroupingExpr) (Value, error);
 	VisitAssign(*AssignExpr) (Value, error);
+	VisitFuncCall(*FuncCall) (Value, error);
 }
 
 type Expr interface {
@@ -51,6 +52,11 @@ type AssignExpr struct {
 	Asset Expr;
 };
 
+type FuncCall struct {
+	Name *lexer.Token;
+	Groups[][]Value;
+}
+
 func (ter *TernaryExpr) Accept(vis ExprVisitor) (Value, error) {
 	return vis.VisitTernary(ter);
 }
@@ -77,4 +83,8 @@ func (grp *GroupingExpr) Accept(vis ExprVisitor) (Value, error) {
 
 func (ass *AssignExpr) Accept(vis ExprVisitor) (Value, error) {
 	return vis.VisitAssign(ass);
+}
+
+func (call *FuncCall) Accept(vis ExprVisitor) (Value, error) {
+	return vis.VisitFuncCall(call);
 }

@@ -1,0 +1,8 @@
+var x;
+
+func setx(val) {
+	x = val;
+}
+
+setx(10);
+print x;

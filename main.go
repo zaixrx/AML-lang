@@ -11,12 +11,12 @@ import (
 	"aml/interpreter"
 )
 
-func evalAML(interpreter *interpreter.Interpreter, filename string, content string) {
+func evalAML(interpreter *interpreter.Interpreter, filename string, content string) parser.Value {
 	scanner := lexer.NewScanner(filename, content);
 	tokens, err := scanner.Scan();
 	if err != nil {
 		fmt.Println(err);
-		return;
+		return nil;
 	}
 	// for _, token := range tokens {
 	// 	fmt.Println(token);
@@ -25,13 +25,14 @@ func evalAML(interpreter *interpreter.Interpreter, filename string, content stri
 	stmts, err := parser.Parse();
 	if err != nil {
 		fmt.Println(err);
-		return;
+		return nil;
 	}
-	err = interpreter.Interpret(stmts);
+	val, err := interpreter.Interpret(stmts);
 	if err != nil {
 		fmt.Println(err);
-		return;
+		return nil;
 	}
+	return val;
 }
 
 func handleREPL() {
@@ -45,7 +46,10 @@ func handleREPL() {
 			fmt.Println("Terminating REPL Process...");
 			break;
 		}
-		evalAML(&interpreter, "REPL", code);
+		val := evalAML(&interpreter, "REPL", code);
+		if val != nil {
+			fmt.Println(val);
+		}
 	}
 }
 
@@ -60,24 +64,18 @@ func handleFile(filename string) error {
 }
 
 func main() {
-	mode := flag.String("mode", "repl", "set interpreter mode");
+	repl := flag.Bool("repl", false, "use repl? else interpret file")
 	flag.Parse();
-	switch *mode {
-		case "repl": {
-			handleREPL();
+	if *repl {
+		handleREPL();
+	} else {
+		if len(os.Args) != 2 {
+			fmt.Printf("usage: %s <file_name>\n", os.Args[0]);
+			return;
 		}
-		case "file": {
-			if len(os.Args) != 4 {
-				fmt.Printf("usage: %s -mode file <file_name>\n", os.Args[1]);
-				return;
-			}
-			err := handleFile(os.Args[3]);
-			if err != nil {
-				fmt.Println(err);
-			}
+		err := handleFile(os.Args[1]);
+		if err != nil {
+			fmt.Println(err);
 		}
-		default: {
-			fmt.Println("unsupported mode");
-		}
-	};
+	}
 }

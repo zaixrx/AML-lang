@@ -1,0 +1,5 @@
+var my_age = 18;
+
+if (my_age < 15) print "damn bro you still young";	
+else if (my_age < 18) print "you are getting old";
+else print "your old as shit";

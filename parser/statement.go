@@ -1,15 +1,21 @@
 package parser
 
+import "aml/lexer"
+
 // TODO: add generic return value ASAP
 type StmtVisitor interface {
-	VisitExpr(*ExprStmt) error;
-	VisitVariableDeclaration(*VarDeclarationStmt)  error;
-	VisitPrint(*PrintStmt) error;
-	VisitBlock(*BlockStmt) error;
+	VisitExpr(*ExprStmt) (Value, error);
+	VisitVariableDeclaration(*VarDeclarationStmt) (Value, error);
+	VisitFuncDeclarationStmt(*FuncDeclarationStmt) (Value, error);
+	VisitPrint(*PrintStmt) (Value, error);
+	VisitBlock(*BlockStmt) (Value, error);
+	VisitConditional(*ConditionalStmt) (Value, error);
+	VisitWhile(*WhileStmt) (Value, error);
+	VisitFor(*ForStmt) (Value, error);
 }
 
 type Stmt interface { 
-	Accept(StmtVisitor) error;
+	Accept(StmtVisitor) (Value, error);
 }
 
 type ExprStmt struct {
@@ -21,28 +27,73 @@ type VarDeclarationStmt struct {
 	Asset Expr;
 }
 
+type Func struct {
+	Params []*lexer.Token;
+	Body []Stmt;
+}
+
+type FuncDeclarationStmt struct {
+	Name *lexer.Token;
+	Data Func;
+}
+
 type PrintStmt struct {
 	Asset Expr;
 }
 
 type BlockStmt struct {
-	Stmts []Stmt;	
+	Stmts []Stmt;
 }
 
-type Statmetsd struct {};
+type ConditionalBranch struct {
+	Condition Expr;
+	NDStmt Stmt; // non-declarative statement
+}
 
-func (stmt *ExprStmt) Accept(vis StmtVisitor) error {
+type ConditionalStmt struct {
+	Branches []ConditionalBranch;
+}
+
+type WhileStmt struct {
+	Cond Expr;
+	NDStmt Stmt;
+}
+
+type ForStmt struct {
+	Init Stmt;
+	Cond Expr;
+	Step Expr;
+	NDStmt Stmt;
+}
+
+func (stmt *ExprStmt) Accept(vis StmtVisitor) (Value, error) {
 	return vis.VisitExpr(stmt);
 }
 
-func (stmt *VarDeclarationStmt) Accept(vis StmtVisitor) error {
+func (stmt *VarDeclarationStmt) Accept(vis StmtVisitor) (Value, error) {
 	return vis.VisitVariableDeclaration(stmt);
 }
 
-func (stmt *PrintStmt) Accept(in StmtVisitor) error {
+func (stmt *FuncDeclarationStmt) Accept(vis StmtVisitor) (Value, error) {
+	return vis.VisitFuncDeclarationStmt(stmt);
+}
+
+func (stmt *PrintStmt) Accept(in StmtVisitor) (Value, error) {
 	return in.VisitPrint(stmt);
 }
 
-func (stmt *BlockStmt) Accept(in StmtVisitor) error {
+func (stmt *BlockStmt) Accept(in StmtVisitor) (Value, error) {
 	return in.VisitBlock(stmt);
+}
+
+func (stmt *ConditionalStmt) Accept(in StmtVisitor) (Value, error) {
+	return in.VisitConditional(stmt);
+}
+
+func (stmt *WhileStmt) Accept(in StmtVisitor) (Value, error) {
+	return in.VisitWhile(stmt);
+}
+
+func (stmt *ForStmt) Accept(in StmtVisitor) (Value, error) {
+	return in.VisitFor(stmt);
 }

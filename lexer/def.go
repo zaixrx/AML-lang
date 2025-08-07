@@ -48,22 +48,24 @@ const (
 	NUMBER
 
 	// Keywords.
-	AND
-	CLASS
-	ELSE
-	FALSE
-	PROD	
-	FOR
-	IF
-	NULL
-	OR
-	PRINT
-	RETURN
-	SUPER
-	THIS
 	TRUE
-	VAR
+	FALSE
+	NULL
+	AND
+	OR
+	IF
+	ELSE
 	WHILE
+	FOR
+	BREAK
+	CONTINUE
+	VAR
+	FUNC	
+	RETURN
+	CLASS
+	THIS
+	SUPER
+	PRINT
 
 	EOF
 );
@@ -73,8 +75,10 @@ var keywords_map = map[string]TokenType {
 	"and": AND,
 	"class": CLASS,
 	"else": ELSE,
-	"prod": PROD,
+	"func": FUNC,
 	"for": FOR,
+	"break": BREAK,
+	"continue": CONTINUE,
 	"if": IF,
 	"null": NULL,
 	"or": OR,
@@ -146,10 +150,14 @@ func (tt TokenType) ToString() string {
 		return "ELSE"
 	case FALSE:
 		return "FALSE"
-	case PROD:
-		return "PROD"
+	case FUNC:
+		return "FUNC"
 	case FOR:
 		return "FOR"
+	case BREAK:
+		return "BREAK"
+	case CONTINUE:
+		return "CONTINUE"
 	case IF:
 		return "IF"
 	case NULL:

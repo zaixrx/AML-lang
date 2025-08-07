@@ -7,8 +7,8 @@
 package parser
 
 import (
-	"aml/lexer"
 	"fmt"
+	"aml/lexer"
 )
 
 type Value = any;
@@ -46,69 +46,250 @@ func (p *Parser) expect(tts ...lexer.TokenType) bool {
 	return false;
 }
 
-func (p *Parser) expect_serie(tts ...lexer.TokenType) []*lexer.Token {
+func (p *Parser) expect_serie(tokens *[]*lexer.Token, tts ...lexer.TokenType) bool {
 	if p.eof(uint(len(tts))) {
-		return nil;
+		return false;
 	}
 	for i, tt := range tts {
 		if token := p.tokens[p.current + i]; token.Type != tt {
-			return nil;
+			return false;
 		}
 	}
-	// TODO: remove this
-	serie := make([]*lexer.Token, len(tts));
-	copy(serie, p.tokens[p.current:p.current+len(tts)]);
 	p.current += len(tts);
-	return serie;
+	if tokens != nil {
+		*tokens = p.tokens[p.current-len(tts):p.current];
+	}
+	return true;
 }
 
-func (p *Parser) declarestmt() (Stmt, error) {
-	if p.expect(lexer.VAR) {
-		if !p.expect(lexer.IDENTIFIER) {
-			return nil, p.generate_expect_error("IDENTIFIER after 'var' in variable declartion");
+// block -> "{" declarativestmt "}"
+func (p *Parser) consume_block() ([]Stmt, error) {
+	stmts := make([]Stmt, 0);
+	for !p.expect(lexer.RIGHT_BRACE) {
+		if p.eof(0) {
+			return nil, p.generate_expect_error("} at the end of the block");
 		}
-		id := p.prev();
-		if !p.expect(lexer.EQUAL) {
-			return nil, p.generate_expect_error("'=' after IDENTIFIER in variable declartion");
-		}
-		target, err := p.expression();
+		stmt, err := p.declarative_statement();
 		if err != nil {
 			return nil, err;
+		}
+		stmts = append(stmts, stmt);
+	}
+	return stmts, nil;
+}
+
+// condstmt -> "if" expr stmt ("else" condstmt | stmt)?
+func (p *Parser) consume_if(branches *[]ConditionalBranch) error {
+	if !p.expect(lexer.LEFT_PAREN) {
+		return p.generate_expect_error("( in if condition");
+	}
+	cond, err := p.expression();
+	if err != nil {
+		return err;
+	}
+	if !p.expect(lexer.RIGHT_PAREN) {
+		return p.generate_expect_error(") in if condition");
+	}
+	ndstmt, err := p.statement();
+	if err != nil {
+		return err;
+	}
+	*branches = append(*branches, ConditionalBranch{
+		Condition: cond,
+		NDStmt: ndstmt,
+	});
+	if p.expect(lexer.ELSE) {
+		if p.expect(lexer.IF) {
+			return p.consume_if(branches);
+		}
+		ndstmt, err = p.statement();
+		if err != nil {
+			return err;
+		}
+		*branches = append(*branches, ConditionalBranch{
+			Condition: nil,
+			NDStmt: ndstmt,
+		});
+	}
+	return nil;
+}
+
+// funcparams -> IDENTIFIER | (IDENTIFIER "," funcparams)
+func (p *Parser) consume_func_params(params *[]*lexer.Token) error {
+	if !p.expect(lexer.IDENTIFIER) {
+		return p.generate_expect_error("valid IDENTIFIER parameter")
+	}
+	*params = append(*params, p.prev());
+	if p.expect(lexer.COMMA) {
+		return p.consume_func_params(params);
+	}
+	if !p.expect(lexer.RIGHT_PAREN) {
+		return p.generate_expect_error("')' in function call");
+	}
+	return nil;
+}
+
+func (p *Parser) consume_func_params_values(params *[]Value) error {
+	val, err := p.expression();
+	if err != nil {
+		return err;
+	}
+	*params = append(*params, val);
+	if p.expect(lexer.COMMA) {
+		return p.consume_func_params_values(params);
+	}
+	if !p.expect(lexer.RIGHT_PAREN) {
+		return p.generate_expect_error("')' in function call");
+	}
+	return nil;
+}
+
+// recursive decent start
+func (p *Parser) declarative_statement() (Stmt, error) {
+	// var -> "var" IDENTIFIER ("=" expression)?
+	if p.expect(lexer.VAR) {
+		var (
+			asset Expr = nil;
+			err error
+		);
+		if !p.expect(lexer.IDENTIFIER) {
+			return nil, p.generate_expect_error("IDENTIFIER in variable declartion");
+		}
+		id := p.prev();
+		if p.expect(lexer.EQUAL) {
+			asset, err = p.expression();
+			if err != nil {
+				return nil, err;
+			}
 		}
 		if !p.expect(lexer.SEMICOLON) {
 			return nil, p.generate_expect_error("';' at the end of the statement.");
 		}
 		return &VarDeclarationStmt{
 			Name: string(id.Lexeme),
-			Asset: target,
+			Asset: asset,
+		}, nil;
+	}
+	// func -> "func" IDENTIFIER "(" funcparams? ")" statement
+	if p.expect(lexer.FUNC) {
+		if !p.expect(lexer.IDENTIFIER) {
+			return nil, p.generate_expect_error("IDENTIFIER in function declartion");
+		}
+		id := p.prev();
+		if !p.expect(lexer.LEFT_PAREN) {
+			return nil, p.generate_expect_error("'(' in function declaration");
+		}
+		params := make([]*lexer.Token, 0);
+		if !p.expect(lexer.RIGHT_PAREN) {
+			if err := p.consume_func_params(&params); err != nil {
+				return nil, err;
+			}
+		}	
+		if !p.expect(lexer.LEFT_BRACE) {
+			return nil, p.generate_expect_error("'{' after function signature")
+		}
+		body, err := p.consume_block();
+		if err != nil {
+			return nil, err;
+		}
+		return &FuncDeclarationStmt{
+			Name: id,
+			Data: Func{
+				Params: params,
+				Body: body,
+			},
 		}, nil;
 	}
 	return p.statement();
 }
 
 func (p *Parser) statement() (Stmt, error) {
-	return p.blockstmt();
-}
-
-// block -> "{" declarestmt* "}"
-func (p *Parser) blockstmt() (Stmt, error) {
-	if p.expect(lexer.LEFT_BRACE) {
-		stmts := make([]Stmt, 0);
-		for !p.expect(lexer.RIGHT_BRACE) {
-			stmt, err := p.declarestmt();
+	if p.expect(lexer.IF) {
+		branches := make([]ConditionalBranch, 0);
+		if err := p.consume_if(&branches); err != nil {
+			return nil, err;
+		}
+		return &ConditionalStmt {
+			Branches: branches,
+		}, nil;
+	}
+	// whileloop -> "while" expression statement
+	if p.expect(lexer.WHILE) {
+		if !p.expect(lexer.LEFT_PAREN) {
+			return nil, p.generate_expect_error("( in while loop condition");
+		}
+		cond, err := p.expression();
+		if err != nil {
+			return nil, err;
+		}
+		if !p.expect(lexer.RIGHT_PAREN) {
+			return nil, p.generate_expect_error(") in while loop condition");
+		}
+		ndstmt, err := p.statement();
+		if err != nil {
+			return nil, err;
+		}
+		return &WhileStmt{
+			Cond: cond,
+			NDStmt: ndstmt,
+		}, nil;
+	}
+	// forloop -> "for" "(" declarative_statement? ";" expession? ";" expression? ")" statement
+	if p.expect(lexer.FOR) {
+		var (
+			init Stmt = nil;
+			cond Expr = nil;
+			step Expr = nil;
+			err error = nil;
+		);
+		if !p.expect(lexer.LEFT_PAREN) {
+			return nil, p.generate_expect_error("( in for loop header");
+		}
+		if !p.expect(lexer.SEMICOLON) {
+			init, err = p.declarative_statement()
 			if err != nil {
 				return nil, err;
 			}
-			stmts = append(stmts, stmt);
+		}
+		if !p.expect(lexer.SEMICOLON) {
+			cond, err = p.expression();
+			if err != nil {
+				return nil, err;
+			}
+			if !p.expect(lexer.SEMICOLON) {
+				return nil, p.generate_expect_error("; in for loop header");
+			}
+		}
+		if !p.expect(lexer.RIGHT_PAREN) {
+			step, err = p.expression();
+			if err != nil {
+				return nil, err;
+			}
+			if !p.expect(lexer.RIGHT_PAREN) {
+				return nil, p.generate_expect_error(") after for loop header");
+			}
+		}
+		ndstmt, err := p.statement();
+		if err != nil {
+			return nil, err;
+		}
+		return &ForStmt {
+			Init: init,
+			Cond: cond,
+			Step: step,
+			NDStmt: ndstmt,
+		}, nil;
+	}
+	if p.expect(lexer.LEFT_BRACE) {
+		stmts, err := p.consume_block();
+		if err != nil {
+			return nil, err;
 		}
 		return &BlockStmt{
 			Stmts: stmts,
 		}, nil;
 	}
-	return p.printstmt();
-}
-
-func (p *Parser) printstmt() (Stmt, error) {
+	// printstmt -> "print" expression ";"
 	if p.expect(lexer.PRINT) {
 		expr, err := p.expression();
 		if err != nil {
@@ -121,10 +302,7 @@ func (p *Parser) printstmt() (Stmt, error) {
 			Asset: expr,
 		}, nil;
 	}
-	return p.exprstmt();
-}
-
-func (p *Parser) exprstmt() (Stmt, error) {
+	// exprstmt -> expression ";"
 	expr, err := p.expression();
 	if err != nil {
 		return nil, err;
@@ -137,7 +315,7 @@ func (p *Parser) exprstmt() (Stmt, error) {
 	}, nil;
 }
 
-// expression -> equality
+// expression -> expressions
 func (p *Parser) expression() (Expr, error) {
 	return p.expressions();
 }
@@ -163,8 +341,10 @@ func (p *Parser) expressions() (Expr, error) {
 	return expr, nil;
 }
 
+// assign -> IDENTIFIER "=" assign
 func (p *Parser) assign() (Expr, error) {
-	if tokens := p.expect_serie(lexer.IDENTIFIER, lexer.EQUAL); tokens != nil {
+	tokens := []*lexer.Token{};
+	if p.expect_serie(&tokens, lexer.IDENTIFIER, lexer.EQUAL) {
 		src, err := p.assign();
 		if err != nil {
 			return nil, err;
@@ -302,6 +482,30 @@ func (p *Parser) unary() (Expr, error) {
 			Operator: operator,
 		}, nil;
 	}
+	return p.call();
+}
+
+// call -> IDENTIFIER ( "(" funcparams ")" )+
+func (p *Parser) call() (Expr, error) {
+	if p.expect(lexer.IDENTIFIER) {
+		name := p.prev();
+		params_groups := make([][]Value, 0);
+		for p.expect(lexer.LEFT_PAREN) {
+			params := make([]Value, 0);
+			if !p.expect(lexer.RIGHT_PAREN) {
+				if err := p.consume_func_params_values(&params); err != nil {
+					return nil, err;
+				}
+			}
+			params_groups = append(params_groups, params);
+		}
+		if len(params_groups) > 0 {
+			return &FuncCall{
+				Name: name,
+				Groups: params_groups,
+			}, nil;
+		}
+	}
 	return p.primary();
 }
 
@@ -341,6 +545,7 @@ func (p *Parser) primary() (Expr, error) {
 	}
 	return nil, p.generate_expect_error("valid token");
 }
+// recursive decent end
 
 func (p *Parser) generate_expect_error(expected string) error {
 	return fmt.Errorf("Parser Error: expected %s\n", expected);
@@ -349,7 +554,7 @@ func (p *Parser) generate_expect_error(expected string) error {
 func (p *Parser) Parse() ([]Stmt, error) {
 	stmts := make([]Stmt, 0);
 	for !p.eof(0) {
-		stmt, err := p.declarestmt();
+		stmt, err := p.declarative_statement();
 		if err != nil {
 			return nil, err;
 		}
