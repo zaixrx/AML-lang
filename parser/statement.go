@@ -7,8 +7,11 @@ type StmtVisitor interface {
 	VisitExpr(*ExprStmt) (Value, error);
 	VisitVariableDeclaration(*VarDeclarationStmt) (Value, error);
 	VisitFuncDeclarationStmt(*FuncDeclarationStmt) (Value, error);
+	VisitReturn(*ReturnStmt) (Value, error);
 	VisitPrint(*PrintStmt) (Value, error);
 	VisitBlock(*BlockStmt) (Value, error);
+	VisitBreak(*BreakStmt) (Value, error);
+	VisitContinue(*ContinueStmt) (Value, error);
 	VisitConditional(*ConditionalStmt) (Value, error);
 	VisitWhile(*WhileStmt) (Value, error);
 	VisitFor(*ForStmt) (Value, error);
@@ -36,6 +39,14 @@ type FuncDeclarationStmt struct {
 	Name *lexer.Token;
 	Data Func;
 }
+
+type ReturnStmt struct {
+	Asset Expr;
+}
+
+type BreakStmt struct {}
+
+type ContinueStmt struct {}
 
 type PrintStmt struct {
 	Asset Expr;
@@ -76,6 +87,18 @@ func (stmt *VarDeclarationStmt) Accept(vis StmtVisitor) (Value, error) {
 
 func (stmt *FuncDeclarationStmt) Accept(vis StmtVisitor) (Value, error) {
 	return vis.VisitFuncDeclarationStmt(stmt);
+}
+
+func (stmt *ReturnStmt) Accept(in StmtVisitor) (Value, error) {
+	return in.VisitReturn(stmt);
+}
+
+func (stmt *BreakStmt) Accept(in StmtVisitor) (Value, error) {
+	return in.VisitBreak(stmt);
+}
+
+func (stmt *ContinueStmt) Accept(in StmtVisitor) (Value, error) {
+	return in.VisitContinue(stmt);
 }
 
 func (stmt *PrintStmt) Accept(in StmtVisitor) (Value, error) {

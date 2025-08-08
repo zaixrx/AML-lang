@@ -1,4 +1,3 @@
-// TODO: support non-cascaded error handling and syntax error recovery
 // in case of entering panic mode (to resume parsing other tokens)
 
 // TODO: Add error productions to handle each binary operator appearing without a left-hand operand.
@@ -124,12 +123,12 @@ func (p *Parser) consume_func_params(params *[]*lexer.Token) error {
 		return p.consume_func_params(params);
 	}
 	if !p.expect(lexer.RIGHT_PAREN) {
-		return p.generate_expect_error("')' in function call");
+		return p.generate_expect_error("')' in function signature");
 	}
 	return nil;
 }
 
-func (p *Parser) consume_func_params_values(params *[]Value) error {
+func (p *Parser) consume_func_params_values(params *[]Expr) error {
 	val, err := p.expression();
 	if err != nil {
 		return err;
@@ -289,6 +288,34 @@ func (p *Parser) statement() (Stmt, error) {
 			Stmts: stmts,
 		}, nil;
 	}
+	// return -> "return" expression? ";"
+	if p.expect(lexer.RETURN) {
+		var ( expr Expr = nil; err error = nil; )
+		if !p.expect(lexer.SEMICOLON) {
+			expr, err = p.expression();
+			if err != nil {
+				return nil, err;
+			}
+			if !p.expect(lexer.SEMICOLON) {
+				return nil, p.generate_expect_error("';' at the end of the return statement");
+			}
+		}
+		return &ReturnStmt{
+			Asset: expr,
+		}, nil;
+	}
+	if p.expect(lexer.BREAK) {
+		if !p.expect(lexer.SEMICOLON) {
+			return nil, p.generate_expect_error("';' at the end of 'break'");
+		}
+		return &BreakStmt{}, nil;
+	}
+	if p.expect(lexer.CONTINUE) {
+		if !p.expect(lexer.SEMICOLON) {
+			return nil, p.generate_expect_error("';' at the end of 'continue'");
+		}
+		return &ContinueStmt{}, nil;
+	}
 	// printstmt -> "print" expression ";"
 	if p.expect(lexer.PRINT) {
 		expr, err := p.expression();
@@ -315,31 +342,31 @@ func (p *Parser) statement() (Stmt, error) {
 	}, nil;
 }
 
-// expression -> expressions
+// expression -> assign 
 func (p *Parser) expression() (Expr, error) {
-	return p.expressions();
+	return p.assign();
 }
 
 // expressions -> assign "," assign | expressions* 
-func (p *Parser) expressions() (Expr, error) {
-	expr, err := p.assign();
-	if err != nil {
-		return nil, err;
-	}
-	if p.expect(lexer.COMMA) {
-		operator := p.prev();
-		right, err := p.assign();
-		if err != nil {
-			return nil, err;
-		}
-		return &BinaryExpr{
-			LOperand: expr,
-			Operator: operator,
-			ROperand: right,
-		}, nil;
-	}
-	return expr, nil;
-}
+// func (p *Parser) expressions() (Expr, error) {
+// 	expr, err := p.assign();
+// 	if err != nil {
+// 		return nil, err;
+// 	}
+// 	if p.expect(lexer.COMMA) {
+// 		operator := p.prev();
+// 		right, err := p.assign();
+// 		if err != nil {
+// 			return nil, err;
+// 		}
+// 		return &BinaryExpr{
+// 			LOperand: expr,
+// 			Operator: operator,
+// 			ROperand: right,
+// 		}, nil;
+// 	}
+// 	return expr, nil;
+// }
 
 // assign -> IDENTIFIER "=" assign
 func (p *Parser) assign() (Expr, error) {
@@ -489,9 +516,9 @@ func (p *Parser) unary() (Expr, error) {
 func (p *Parser) call() (Expr, error) {
 	if p.expect(lexer.IDENTIFIER) {
 		name := p.prev();
-		params_groups := make([][]Value, 0);
+		params_groups := make([][]Expr, 0);
 		for p.expect(lexer.LEFT_PAREN) {
-			params := make([]Value, 0);
+			params := make([]Expr, 0);
 			if !p.expect(lexer.RIGHT_PAREN) {
 				if err := p.consume_func_params_values(&params); err != nil {
 					return nil, err;
@@ -505,6 +532,7 @@ func (p *Parser) call() (Expr, error) {
 				Groups: params_groups,
 			}, nil;
 		}
+		p.current--; // TODO: fix that fucker
 	}
 	return p.primary();
 }

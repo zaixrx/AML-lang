@@ -1,8 +1,4 @@
-var x;
-
-func setx(val) {
-	x = val;
+func fib(n) {
+	return n > 2 ? fib(n - 1) + fib(n - 2) : n;
 }
-
-setx(10);
-print x;
+print fib(10);

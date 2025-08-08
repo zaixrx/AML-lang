@@ -1,11 +1,33 @@
 package interpreter
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+
 	"aml/lexer"
 	"aml/parser"
 );
+
+type ReturnError struct {
+	value parser.Value;
+}
+
+func (err *ReturnError) Error() string {
+	return "RUNTIME ERROR: 'return' should only be used inside a function";
+}
+
+type BreakError struct {}
+
+func (err *BreakError) Error() string {
+	return "RUNTIME ERROR: 'break' should only be used inside 'for' or 'while'";
+}
+
+type ContinueError struct {}
+
+func (err *ContinueError) Error() string {
+	return "RUNTIME ERROR: 'continue' should only be used inside 'for' or 'while'";
+}
 
 type Environment struct {
 	vars map[string]parser.Value;
@@ -276,27 +298,59 @@ func (in Interpreter) VisitFuncCall(expr *parser.FuncCall) (parser.Value, error)
 	if err != nil {
 		return nil, err;
 	}
+	// setup function environment
 	env := NewEnvironment();
+	env.prev = in.environment;
 	in.environment = env;
-
+	defer func() { 
+		in.environment = in.environment.prev;
+	}();
 	// TODO: add support for functions returning functions
 	params := expr.Groups[0];
-
 	if len(fn.Params) != len(params) {
 		return nil, in.generate_error("expected %d parameters got %d", len(fn.Params), len(params));
 	}
-
+	// load parameters into function environment
 	for i, param := range fn.Params {
-		env.declare_var(string(param.Lexeme), params[i]);
+		val, err := params[i].Accept(in);
+		if err != nil {
+			return nil, err;
+		}
+		env.declare_var(string(param.Lexeme), val);
 	}
-
+	var retvalue parser.Value = nil;
 	for _, stmt := range fn.Body {
 		if _, err := stmt.Accept(in); err != nil {
+			var reterr *ReturnError;
+			if errors.As(err, &reterr) {
+				retvalue = reterr.value;
+				break;
+			}
 			return nil, err;
 		}
 	}
-	// TODO: add return
-	return nil, nil;
+	return retvalue, nil;
+}
+
+func (in Interpreter) VisitReturn(stmt *parser.ReturnStmt) (parser.Value, error) {
+	var ( value parser.Value; err error = nil; );
+	if stmt.Asset != nil {
+		value, err = stmt.Asset.Accept(in);
+		if err != nil {
+			return nil, err;
+		}
+	}
+	return nil, &ReturnError{
+		value: value,
+	};
+}
+
+func (in Interpreter) VisitBreak(_ *parser.BreakStmt) (parser.Value, error) {
+	return nil, &BreakError{};
+}
+
+func (in Interpreter) VisitContinue(_ *parser.ContinueStmt) (parser.Value, error) {
+	return nil, &ContinueError{};
 }
 
 // statements
@@ -341,26 +395,26 @@ func (in Interpreter) VisitPrint(stmt *parser.PrintStmt) (parser.Value, error) {
 
 func (in Interpreter) VisitBlock(block *parser.BlockStmt) (parser.Value, error) {
 	var (
-		err error = nil;
 		val parser.Value = nil;
 		env = NewEnvironment();
 	);
 	// create new environment
 	env.prev = in.environment;
 	in.environment = env;
+	defer func () {
+		in.environment = in.environment.prev;
+	}();
 	// execute all environment statements
 	for _, stmt := range block.Stmts {
 		sval, err := stmt.Accept(in);
 		if err != nil {
-			break;
+			return nil, err;
 		}
 		if sval != nil {
 			val = sval;
 		}
 	}
-	// return to old environment
-	in.environment = in.environment.prev;
-	return val, err;
+	return val, nil;
 }
 
 func (in Interpreter) VisitConditional(stmt *parser.ConditionalStmt) (parser.Value, error) {
@@ -407,7 +461,7 @@ func (in Interpreter) VisitFor(stmt *parser.ForStmt) (parser.Value, error) {
 	var (
 		err error = nil;
 		val parser.Value = nil;
-		cond parser.Value = nil;
+		cond parser.Value = true;
 	);
 	if stmt.Init != nil {
 		_, err = stmt.Init.Accept(in);
@@ -415,6 +469,10 @@ func (in Interpreter) VisitFor(stmt *parser.ForStmt) (parser.Value, error) {
 			return nil, err;
 		}
 	}
+	var (
+		break_err *BreakError;
+		continue_err *ContinueError;
+	);
 loop:
 	if stmt.Cond != nil {
 		cond, err = stmt.Cond.Accept(in)
@@ -425,7 +483,13 @@ loop:
 	if in.extract_boolean(cond) {
 		val, err = stmt.NDStmt.Accept(in);
 		if err != nil {
-			return nil, err;
+			if errors.As(err, &break_err) {
+				goto exit_loop;
+			}
+			// continue will basically continue
+			if !errors.As(err, &continue_err) {
+				return nil, err;
+			}
 		}
 		if stmt.Step != nil {
 			_, err = stmt.Step.Accept(in);
@@ -435,6 +499,7 @@ loop:
 		}
 		goto loop;
 	}
+exit_loop:
 	return val, nil;
 }
 

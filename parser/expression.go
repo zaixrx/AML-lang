@@ -54,7 +54,7 @@ type AssignExpr struct {
 
 type FuncCall struct {
 	Name *lexer.Token;
-	Groups[][]Value;
+	Groups[][]Expr;
 }
 
 func (ter *TernaryExpr) Accept(vis ExprVisitor) (Value, error) {
