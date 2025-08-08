@@ -26,13 +26,13 @@ type TernaryExpr struct {
 
 type BinaryExpr struct {
 	LOperand Expr
-	Operator *lexer.Token
+	Operator lexer.Token
 	ROperand Expr	
 };
 
 type UnaryExpr struct {
 	Operand Expr
-	Operator *lexer.Token
+	Operator lexer.Token
 };
 
 type LiteralExpr struct {
@@ -40,7 +40,7 @@ type LiteralExpr struct {
 };
 
 type VariableExpr struct {
-	Name *lexer.Token;
+	Name lexer.Token;
 };
 
 type GroupingExpr struct {
@@ -53,8 +53,8 @@ type AssignExpr struct {
 };
 
 type FuncCall struct {
-	Name *lexer.Token;
-	Groups[][]Expr;
+	Callee Expr;
+	Args[] Expr;
 }
 
 func (ter *TernaryExpr) Accept(vis ExprVisitor) (Value, error) {

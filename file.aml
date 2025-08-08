@@ -1,8 +1,0 @@
-var message = "Hello World";
-var old_message = " I'm Anis!";
-print message + old_message;
-{
-	var message = "New Hello World";
-	print message + old_message;
-}
-print message + old_message;

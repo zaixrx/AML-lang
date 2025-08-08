@@ -8,7 +8,7 @@ import (
 type Scanner struct {
 	filename string
 	source []rune 
-	tokens []*Token
+	tokens []Token
 
 	start uint
 	current uint
@@ -19,7 +19,7 @@ func NewScanner(filename string, source string) *Scanner {
 	return &Scanner {
 		filename: filename,
 		source: []rune(source),
-		tokens: make([]*Token, 0),
+		tokens: make([]Token, 0),
 		start: 0,
 		current: 0,
 		line: 1,
@@ -27,8 +27,8 @@ func NewScanner(filename string, source string) *Scanner {
 }
 
 // atomic
-func (s *Scanner) add_token_literal(tt TokenType, literal any) *Token {
-	token := &Token{
+func (s *Scanner) add_token_literal(tt TokenType, literal any) Token {
+	token := Token{
 		Type: tt,
 		Lexeme: s.source[s.start : s.current],
 		Literal: literal,
@@ -39,7 +39,7 @@ func (s *Scanner) add_token_literal(tt TokenType, literal any) *Token {
 }
 
 // molecular
-func (s *Scanner) add_token(tt TokenType) *Token {
+func (s *Scanner) add_token(tt TokenType) Token {
 	return s.add_token_literal(tt, nil);
 }
 
@@ -222,7 +222,7 @@ func (s *Scanner) scan_curr() error {
 }
 
 // organelle
-func (s *Scanner) Scan() ([]*Token, error) {
+func (s *Scanner) Scan() ([]Token, error) {
 	for !s.eof() {
 		if err := s.scan_curr(); err != nil {
 			return nil, err

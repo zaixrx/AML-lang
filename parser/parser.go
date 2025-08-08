@@ -14,10 +14,10 @@ type Value = any;
 
 type Parser struct {
 	current int;
-	tokens []*lexer.Token;
+	tokens []lexer.Token;
 };
 
-func NewParser(tokens []*lexer.Token) *Parser {
+func NewParser(tokens []lexer.Token) *Parser {
 	return &Parser {
 		tokens: tokens,
 		current: 0,
@@ -28,7 +28,7 @@ func (p *Parser) eof(offset uint) bool {
 	return p.current + int(offset) >= len(p.tokens);
 }
 
-func (p *Parser) prev() *lexer.Token {
+func (p *Parser) prev() lexer.Token {
 	return p.tokens[p.current - 1];
 }
 
@@ -45,7 +45,7 @@ func (p *Parser) expect(tts ...lexer.TokenType) bool {
 	return false;
 }
 
-func (p *Parser) expect_serie(tokens *[]*lexer.Token, tts ...lexer.TokenType) bool {
+func (p *Parser) expect_serie(tokens *[]lexer.Token, tts ...lexer.TokenType) bool {
 	if p.eof(uint(len(tts))) {
 		return false;
 	}
@@ -113,32 +113,59 @@ func (p *Parser) consume_if(branches *[]ConditionalBranch) error {
 	return nil;
 }
 
-// funcparams -> IDENTIFIER | (IDENTIFIER "," funcparams)
-func (p *Parser) consume_func_params(params *[]*lexer.Token) error {
+// func -> IDENTIFIER "(" params? ")" block
+func (p *Parser) consume_func() (*Func, error) {
 	if !p.expect(lexer.IDENTIFIER) {
-		return p.generate_expect_error("valid IDENTIFIER parameter")
+		return nil, p.generate_expect_error("IDENTIFIER in function signature");
+	}
+	name := p.prev();
+	if !p.expect(lexer.LEFT_PAREN) {
+		return nil, p.generate_expect_error("'(' in function signature");
+	}
+	params := make([]lexer.Token, 0);
+	if !p.expect(lexer.RIGHT_PAREN) {
+		if err := p.consume_func_params(&params); err != nil {
+			return nil, err;
+		}
+		if !p.expect(lexer.RIGHT_PAREN) {
+			return nil, p.generate_expect_error("')' in function signature");
+		}
+	}
+	if !p.expect(lexer.LEFT_BRACE) {
+		return nil, p.generate_expect_error("'{' to start function body")
+	}
+	body, err := p.consume_block();
+	if err != nil {
+		return nil, err;
+	}
+	return &Func{
+		Name: name,
+		Params: params,
+		Body: body,
+	}, nil;
+}
+
+// params -> IDENTIFIER | (IDENTIFIER "," params)
+func (p *Parser) consume_func_params(params *[]lexer.Token) error {
+	if !p.expect(lexer.IDENTIFIER) {
+		return p.generate_expect_error("IDENTIFIER as a parameter")
 	}
 	*params = append(*params, p.prev());
 	if p.expect(lexer.COMMA) {
 		return p.consume_func_params(params);
 	}
-	if !p.expect(lexer.RIGHT_PAREN) {
-		return p.generate_expect_error("')' in function signature");
-	}
 	return nil;
 }
 
-func (p *Parser) consume_func_params_values(params *[]Expr) error {
+// args -> expression | (expression "," args)
+func (p *Parser) consume_func_args(params *[]Expr) error {
 	val, err := p.expression();
 	if err != nil {
 		return err;
 	}
 	*params = append(*params, val);
 	if p.expect(lexer.COMMA) {
-		return p.consume_func_params_values(params);
-	}
-	if !p.expect(lexer.RIGHT_PAREN) {
-		return p.generate_expect_error("')' in function call");
+		return p.consume_func_args(params);
 	}
 	return nil;
 }
@@ -169,35 +196,13 @@ func (p *Parser) declarative_statement() (Stmt, error) {
 			Asset: asset,
 		}, nil;
 	}
-	// func -> "func" IDENTIFIER "(" funcparams? ")" statement
+	// funcdecl -> "func" func
 	if p.expect(lexer.FUNC) {
-		if !p.expect(lexer.IDENTIFIER) {
-			return nil, p.generate_expect_error("IDENTIFIER in function declartion");
-		}
-		id := p.prev();
-		if !p.expect(lexer.LEFT_PAREN) {
-			return nil, p.generate_expect_error("'(' in function declaration");
-		}
-		params := make([]*lexer.Token, 0);
-		if !p.expect(lexer.RIGHT_PAREN) {
-			if err := p.consume_func_params(&params); err != nil {
-				return nil, err;
-			}
-		}	
-		if !p.expect(lexer.LEFT_BRACE) {
-			return nil, p.generate_expect_error("'{' after function signature")
-		}
-		body, err := p.consume_block();
+		fn, err := p.consume_func();
 		if err != nil {
 			return nil, err;
 		}
-		return &FuncDeclarationStmt{
-			Name: id,
-			Data: Func{
-				Params: params,
-				Body: body,
-			},
-		}, nil;
+		return (*FuncDeclarationStmt)(fn), nil;
 	}
 	return p.statement();
 }
@@ -370,7 +375,7 @@ func (p *Parser) expression() (Expr, error) {
 
 // assign -> IDENTIFIER "=" assign
 func (p *Parser) assign() (Expr, error) {
-	tokens := []*lexer.Token{};
+	tokens := []lexer.Token{};
 	if p.expect_serie(&tokens, lexer.IDENTIFIER, lexer.EQUAL) {
 		src, err := p.assign();
 		if err != nil {
@@ -514,27 +519,30 @@ func (p *Parser) unary() (Expr, error) {
 
 // call -> IDENTIFIER ( "(" funcparams ")" )+
 func (p *Parser) call() (Expr, error) {
-	if p.expect(lexer.IDENTIFIER) {
-		name := p.prev();
-		params_groups := make([][]Expr, 0);
-		for p.expect(lexer.LEFT_PAREN) {
-			params := make([]Expr, 0);
+	expr, err := p.primary();
+	if err != nil {
+		return nil, err;
+	}
+	for ;; {
+		if p.expect(lexer.LEFT_PAREN) {
+			args := make([]Expr, 0);
 			if !p.expect(lexer.RIGHT_PAREN) {
-				if err := p.consume_func_params_values(&params); err != nil {
+				if err := p.consume_func_args(&args); err != nil {
 					return nil, err;
 				}
+				if !p.expect(lexer.RIGHT_PAREN) {
+					return nil, p.generate_expect_error("')' in function call");
+				}
 			}
-			params_groups = append(params_groups, params);
+			expr = &FuncCall{
+				Callee: expr,
+				Args: args,
+			};
+		} else {
+			break;
 		}
-		if len(params_groups) > 0 {
-			return &FuncCall{
-				Name: name,
-				Groups: params_groups,
-			}, nil;
-		}
-		p.current--; // TODO: fix that fucker
 	}
-	return p.primary();
+	return expr, nil;
 }
 
 // primary -> IDENTIFIER | STRING | NUMBER | "true" | "false" | "null" | "(" expression ")"

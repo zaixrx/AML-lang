@@ -1,138 +1,12 @@
 package interpreter
 
 import (
-	"errors"
 	"fmt"
+	"errors"
 	"reflect"
-
 	"aml/lexer"
 	"aml/parser"
 );
-
-type ReturnError struct {
-	value parser.Value;
-}
-
-func (err *ReturnError) Error() string {
-	return "RUNTIME ERROR: 'return' should only be used inside a function";
-}
-
-type BreakError struct {}
-
-func (err *BreakError) Error() string {
-	return "RUNTIME ERROR: 'break' should only be used inside 'for' or 'while'";
-}
-
-type ContinueError struct {}
-
-func (err *ContinueError) Error() string {
-	return "RUNTIME ERROR: 'continue' should only be used inside 'for' or 'while'";
-}
-
-type Environment struct {
-	vars map[string]parser.Value;
-	functions map[string]parser.Func;
-	prev *Environment;
-};
-
-func NewEnvironment() *Environment {
-	return &Environment{
-		vars: make(map[string]parser.Value),
-		functions: make(map[string]parser.Func),
-		prev: nil,
-	};
-}
-
-func (env *Environment) get_var(name string) (parser.Value, error) {
-	curr := env;
-	for curr != nil {
-		if value, exists := curr.vars[name]; exists {
-			return value, nil;
-		}
-		curr = curr.prev;
-	}
-	return nil, fmt.Errorf("variable %s is not declared", name);
-}
-
-func (env *Environment) declare_var(name string, value parser.Value) error {
-	if _, exists := env.vars[name]; exists {
-		return fmt.Errorf("variable %s is already declared", name);
-	}
-	env.vars[name] = value;
-	return nil;
-}
-
-func (env *Environment) get_function(name string) (*parser.Func, error) {
-	curr := env;
-	for curr != nil {
-		if value, exists := curr.functions[name]; exists {
-			return &value, nil;
-		}
-		curr = curr.prev;
-	}
-	return nil, fmt.Errorf("function %s is not declared", name);
-}
-
-func (env *Environment) declare_function(name string, params []*lexer.Token, body []parser.Stmt) error {
-	if _, exists := env.functions[name]; exists {
-		return fmt.Errorf("function %s is already declared", name);
-	}
-	env.functions[name] = parser.Func{
-		Params: params,
-		Body: body,
-	}
-	return nil;
-}
-
-func (env *Environment) assign(name string, new_value parser.Value) error {
-	curr := env;
-	for curr != nil {
-		if _, exists := curr.vars[name]; exists {
-			curr.vars[name] = new_value;
-			return nil;
-		}
-		curr = curr.prev;
-	}
-	return fmt.Errorf("variable %s is not declared", name);
-}
-
-type Interpreter struct {
-	environment *Environment;
-};
-
-func (in Interpreter) generate_error(format string, args ...any) error {
-	return fmt.Errorf("RUNTIME ERROR: %s", fmt.Sprintf(format, args...));
-}
-
-func (in Interpreter) extract_boolean(value parser.Value) bool {
-	if value == nil || value == false {
-		return false;
-	}
-	return true;
-}
-
-func (in Interpreter) extract_number(value parser.Value) (bool, float64) {
-	if reflect.TypeOf(value).Kind() != reflect.Float64 {
-		return false, 0;
-	}
-	return true, reflect.ValueOf(value).Float();
-}
-
-func (in Interpreter) extract_numbers(values ...parser.Value) (bool, []float64) {
-	nums := make([]float64, len(values));
-	for i, value := range values {
-		succ, num := in.extract_number(value);
-		if !succ {
-			return false, nil;
-		}
-		nums[i] = num;
-	}
-	return true, nums;
-}
-
-func (in Interpreter) equal(a parser.Value, b parser.Value) bool {
-	return reflect.ValueOf(a).Equal(reflect.ValueOf(b));
-}
 
 // expressions
 func (in Interpreter) VisitUnary(expr *parser.UnaryExpr) (parser.Value, error) {
@@ -155,10 +29,6 @@ func (in Interpreter) VisitUnary(expr *parser.UnaryExpr) (parser.Value, error) {
 	return nil, in.generate_error("invalid unary operation, got %s", expr.Operator.Type.ToString());
 }
 
-func (in Interpreter) stringify(value parser.Value) string {
-	return fmt.Sprint(value);
-}
-
 func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error) {
 	leftval, err := expr.LOperand.Accept(in);
 	if err != nil {
@@ -177,7 +47,7 @@ func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error)
 				}
 				return nums[0] + nums[1], nil;
 			} else if reflect.TypeOf(leftval).Kind() == reflect.String {
-				return string(in.stringify(leftval) + in.stringify(rightval)), nil;
+				return string(in.extract_string(leftval) + in.extract_string(rightval)), nil;
 			}
 			return nil, in.generate_error("operands in binary '+' must be strings or numbers");
 		};
@@ -274,7 +144,7 @@ func (in Interpreter) VisitLiteral(expr *parser.LiteralExpr) (parser.Value, erro
 }
 
 func (in Interpreter) VisitVariable(expr *parser.VariableExpr) (parser.Value, error) {
-	value, err := in.environment.get_var(string(expr.Name.Lexeme));
+	value, err := in.environment.get(string(expr.Name.Lexeme));
 	if err != nil {
 		return nil, in.generate_error("%s", err.Error());
 	}
@@ -294,42 +164,30 @@ func (in Interpreter) VisitAssign(expr *parser.AssignExpr) (parser.Value, error)
 }
 
 func (in Interpreter) VisitFuncCall(expr *parser.FuncCall) (parser.Value, error) {
-	fn, err := in.environment.get_function(string(expr.Name.Lexeme));
+	val, err := expr.Callee.Accept(in);
 	if err != nil {
 		return nil, err;
 	}
-	// setup function environment
-	env := NewEnvironment();
-	env.prev = in.environment;
-	in.environment = env;
-	defer func() { 
-		in.environment = in.environment.prev;
-	}();
-	// TODO: add support for functions returning functions
-	params := expr.Groups[0];
-	if len(fn.Params) != len(params) {
-		return nil, in.generate_error("expected %d parameters got %d", len(fn.Params), len(params));
+	fn, callable_ok := val.(Callable); // ok is only true for foreign functions
+	if !callable_ok {
+		parser_fn, func_ok := val.(parser.Func);
+		if !func_ok {
+			return nil, in.generate_error("invalid callee target");
+		}
+		fn = AMLFunc(parser_fn); // UGLY
 	}
-	// load parameters into function environment
-	for i, param := range fn.Params {
-		val, err := params[i].Accept(in);
+	if int(fn.Arity()) != len(expr.Args) {
+		return nil, in.generate_error("expected %d arguments got %d", fn.Arity(), len(expr.Args));
+	}
+	args := make([]parser.Value, fn.Arity());
+	for i := range fn.Arity() {
+		val, err := expr.Args[i].Accept(in);
 		if err != nil {
 			return nil, err;
 		}
-		env.declare_var(string(param.Lexeme), val);
+		args[i] = val;
 	}
-	var retvalue parser.Value = nil;
-	for _, stmt := range fn.Body {
-		if _, err := stmt.Accept(in); err != nil {
-			var reterr *ReturnError;
-			if errors.As(err, &reterr) {
-				retvalue = reterr.value;
-				break;
-			}
-			return nil, err;
-		}
-	}
-	return retvalue, nil;
+	return fn.Execute(in, args);
 }
 
 func (in Interpreter) VisitReturn(stmt *parser.ReturnStmt) (parser.Value, error) {
@@ -369,7 +227,7 @@ func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) 
 			return nil, err;
 		}
 	}
-	err = in.environment.declare_var(stmt.Name, value);
+	err = in.environment.declare(stmt.Name, value);
 	if err != nil {
 		return nil, in.generate_error("%s", err.Error());
 	}
@@ -377,7 +235,7 @@ func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) 
 }
 
 func (in Interpreter) VisitFuncDeclarationStmt(stmt *parser.FuncDeclarationStmt) (parser.Value, error) {
-	err := in.environment.declare_function(string(stmt.Name.Lexeme), stmt.Data.Params, stmt.Data.Body);
+	err := in.environment.declare(string(stmt.Name.Lexeme), parser.Func(*stmt));
 	if err != nil {
 		return nil, in.generate_error("%s", err.Error());
 	}
@@ -389,17 +247,16 @@ func (in Interpreter) VisitPrint(stmt *parser.PrintStmt) (parser.Value, error) {
 	if err != nil {
 		return nil, err;
 	}
-	fmt.Printf("%s\n", in.stringify(val));
+	fmt.Printf("%s\n", in.extract_string(val));
 	return nil, nil;
 }
 
 func (in Interpreter) VisitBlock(block *parser.BlockStmt) (parser.Value, error) {
 	var (
 		val parser.Value = nil;
-		env = NewEnvironment();
+		env = NewEnvironment(in.environment);
 	);
 	// create new environment
-	env.prev = in.environment;
 	in.environment = env;
 	defer func () {
 		in.environment = in.environment.prev;
@@ -504,8 +361,12 @@ exit_loop:
 }
 
 func NewInterpreter() Interpreter {
+	global_env := NewEnvironment(nil);
+	for key, val := range GetStdFuncs() {
+		global_env.declare(key, val);
+	}
 	return Interpreter {
-		environment: NewEnvironment(),
+		environment: global_env,
 	};
 }
 

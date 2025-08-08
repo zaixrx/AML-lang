@@ -31,14 +31,12 @@ type VarDeclarationStmt struct {
 }
 
 type Func struct {
-	Params []*lexer.Token;
+	Name lexer.Token;
+	Params []lexer.Token;
 	Body []Stmt;
 }
 
-type FuncDeclarationStmt struct {
-	Name *lexer.Token;
-	Data Func;
-}
+type FuncDeclarationStmt Func;
 
 type ReturnStmt struct {
 	Asset Expr;

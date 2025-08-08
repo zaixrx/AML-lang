@@ -1,4 +1,9 @@
 func fib(n) {
 	return n > 2 ? fib(n - 1) + fib(n - 2) : n;
 }
-print fib(10);
+
+func get_fib() {
+	return fib;
+}
+
+print get_fib()(10);
