@@ -1,3 +1,42 @@
+# Example
+
+```aml
+func get_fib() {
+    func fib(n) {
+        return n > 2 ? fib(n - 1) + fib(n - 2) : n;
+    }
+    return fib;
+}
+var fib = get_fib();
+var start = time();
+for (var i = 0; i < 10; i = i + 1) {
+    print fib(i);
+}
+print time() - start;
+```
+
+# Usage
+
+```bash
+git clone https://github.com/zaixrx/AML-lang.git
+cd ./AML-lang && go build -o aml
+```
+
+you can either use repl
+```bash
+./aml -repl
+
+>> print "Hello, World!";
+"Hello, World!"
+```
+
+or interpret an existing file
+```bash
+./aml ./examples/helloworld.aml
+
+"Hello, World!"
+```
+
 # Resources
 - crafting interpreters: \
     https://craftinginterpreters.com
