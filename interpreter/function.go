@@ -1,31 +1,36 @@
 package interpreter
 
 import (
-	"aml/parser"
+	"fmt"
 	"errors"
+
+	"aml/parser"
 );
 
-type AMLFunc parser.Func;
+type AMLFunc struct {
+	closure *Environment;
+	internal parser.Func;
+}
 
 func (fn AMLFunc) Arity() byte {
-	return byte(len(fn.Params));
+	return byte(len(fn.internal.Params));
 }
 
 func (fn AMLFunc) Execute(in Interpreter, args []parser.Value) (parser.Value, error) {
-	env := NewEnvironment(in.environment);
-	in.environment = env;
-	defer func() { in.environment = in.environment.prev }();
+	old_env := in.environment;
+	env := NewEnvironment(fn.closure); in.environment = env;
+	defer func() { in.environment = old_env; }();
 	for i, arg := range args {
-		err := env.declare(string(fn.Params[i].Lexeme), arg);
+		err := env.declare(string(fn.internal.Params[i].Lexeme), arg);
 		if err != nil {
 			return nil, err;
 		}
 	}
 	var (
-		retvalue parser.Value = nil
 		reterr *ReturnError = nil
+		retvalue parser.Value = nil
 	);
-	for _, stmt := range fn.Body {
+	for _, stmt := range fn.internal.Body {
 		if _, err := stmt.Accept(in); err != nil {
 			if errors.As(err, &reterr) {
 				retvalue = reterr.value;
@@ -35,4 +40,8 @@ func (fn AMLFunc) Execute(in Interpreter, args []parser.Value) (parser.Value, er
 		}
 	}
 	return retvalue, nil;
+}
+
+func (fn AMLFunc) String() string {
+	return fmt.Sprintf("function %s/%d", string(fn.internal.Name.Lexeme), fn.Arity());
 }

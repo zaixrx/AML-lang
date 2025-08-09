@@ -168,13 +168,9 @@ func (in Interpreter) VisitFuncCall(expr *parser.FuncCall) (parser.Value, error)
 	if err != nil {
 		return nil, err;
 	}
-	fn, callable_ok := val.(Callable); // ok is only true for foreign functions
+	fn, callable_ok := val.(Callable);
 	if !callable_ok {
-		parser_fn, func_ok := val.(parser.Func);
-		if !func_ok {
-			return nil, in.generate_error("invalid callee target");
-		}
-		fn = AMLFunc(parser_fn); // UGLY
+		return nil, in.generate_error("invalid callee target");
 	}
 	if int(fn.Arity()) != len(expr.Args) {
 		return nil, in.generate_error("expected %d arguments got %d", fn.Arity(), len(expr.Args));
@@ -235,7 +231,10 @@ func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) 
 }
 
 func (in Interpreter) VisitFuncDeclarationStmt(stmt *parser.FuncDeclarationStmt) (parser.Value, error) {
-	err := in.environment.declare(string(stmt.Name.Lexeme), parser.Func(*stmt));
+	err := in.environment.declare(string(stmt.Name.Lexeme), AMLFunc{
+		closure: in.environment,
+		internal: parser.Func(*stmt),
+	});
 	if err != nil {
 		return nil, in.generate_error("%s", err.Error());
 	}

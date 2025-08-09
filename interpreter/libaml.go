@@ -1,9 +1,10 @@
 package interpreter
 
 import (
-	"os"
-	"bufio"
 	"aml/parser"
+	"bufio"
+	"os"
+	"time"
 );
 
 type StdRead struct {};
@@ -21,8 +22,27 @@ func (StdRead) Execute(Interpreter, []parser.Value) (parser.Value, error) {
 	return bytes, nil;
 }
 
+func (StdRead) String() string {
+	return "native: stdread/0";
+}
+
+type StdTime struct {};
+
+func (StdTime) Arity() byte {
+	return 0;
+}
+
+func (StdTime) Execute(Interpreter, []parser.Value) (parser.Value, error) {
+	return float64(time.Now().UnixMilli()), nil;
+}
+
+func (StdTime) String() string {
+	return "native: stdtime/0";
+}
+
 func GetStdFuncs() map[string]parser.Value {
 	return map[string]parser.Value{
 		"read": StdRead{},
+		"time": StdTime{},
 	};
 }

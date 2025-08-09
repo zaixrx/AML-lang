@@ -72,6 +72,7 @@ func (env *Environment) assign(name string, new_value parser.Value) error {
 type Callable interface {
 	Arity() byte;
 	Execute(in Interpreter, args []parser.Value) (parser.Value, error);
+	String() string;
 }
 
 type Interpreter struct {

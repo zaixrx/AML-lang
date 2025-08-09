@@ -1,9 +1,15 @@
-func fib(n) {
-	return n > 2 ? fib(n - 1) + fib(n - 2) : n;
-}
-
 func get_fib() {
+	var i = 0;
+	func fib(n) {
+		print i = i + 1;
+		return n > 2 ? fib(n - 1) + fib(n - 2) : n;
+	}
 	return fib;
 }
-
-print get_fib()(10);
+var fib = get_fib();
+print fib(10);
+// get_fib()(10); won't work because
+// fib is a recursive function that
+// means it needs to refer to itself
+// which requires it to be stored in
+// a local or an outer environment
