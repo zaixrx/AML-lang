@@ -584,7 +584,8 @@ func (p *Parser) primary() (Expr, error) {
 // recursive decent end
 
 func (p *Parser) generate_expect_error(expected string) error {
-	return fmt.Errorf("Parser Error: expected %s\n", expected);
+	tok := p.tokens[p.current];
+	return fmt.Errorf("Parser Error: expected %s found %s at line %d\n", expected, string(tok.Lexeme), tok.Line);
 }
 
 func (p *Parser) Parse() ([]Stmt, error) {

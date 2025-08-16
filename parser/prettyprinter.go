@@ -231,9 +231,15 @@ func (p *PrettyPrinter) VisitWhile(whl *WhileStmt) (Value, error) {
 func (p *PrettyPrinter) VisitFor(fors *ForStmt) (Value, error) {
 	p.print_header("ForStatement");
 	p.tab();
-		p.print_def_stmt("Init", fors.Init);
-		p.print_def_expr("Cond", fors.Cond);
-		p.print_def_expr("Step", fors.Step);
+		if fors.Init != nil {
+			p.print_def_stmt("Init", fors.Init);
+		}
+		if fors.Cond != nil {
+			p.print_def_expr("Cond", fors.Cond);
+		}
+		if fors.Step != nil {
+			p.print_def_expr("Step", fors.Step);
+		}
 		p.print_def_stmt("Body", fors.NDStmt);
 	p.untab();
 	return nil, nil;
@@ -241,5 +247,5 @@ func (p *PrettyPrinter) VisitFor(fors *ForStmt) (Value, error) {
 
 func (p *PrettyPrinter) Print(stmt Stmt) {
 	stmt.Accept(p);
-	fmt.Print(p.builder.String(), "-- stmtend --");
+	fmt.Print(p.builder.String());
 }

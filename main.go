@@ -28,8 +28,8 @@ func evalAML(interpreter *interpreter.Interpreter, filename string, content stri
 		return nil;
 	}
 	if use_pp {
-		pp := parser.PrettyPrinter{};
 		for _, stmt := range stmts {
+			pp := parser.PrettyPrinter{};
 		 	pp.Print(stmt);
 		}
 	}
@@ -71,16 +71,16 @@ func handleFile(filename string, use_pp bool) error {
 
 func main() {
 	repl := flag.Bool("repl", false, "use repl? else interpret file")
-	use_pp := flag.Bool("p", true, "Use PrettyPrinter to Print ASTs");
+	use_pp := flag.Bool("p", false, "Use PrettyPrinter to Print ASTs");
 	flag.Parse();
 	if *repl {
 		handleREPL(*use_pp);
 	} else {
 		if len(os.Args) < 2 {
-			fmt.Printf("usage: %s <file_name> [-p]\n", os.Args[0]);
+			fmt.Printf("usage: %s [-p] <file_name>\n", os.Args[0]);
 			return;
 		}
-		err := handleFile(os.Args[1], *use_pp);
+		err := handleFile(os.Args[len(os.Args) - 1], *use_pp);
 		if err != nil {
 			fmt.Println(err);
 		}

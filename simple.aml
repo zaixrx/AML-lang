@@ -1,33 +1,25 @@
-// print formatting
-// post-pre increment expressions
-// += *= /= -=
-// do while
-
-var name;
-var games;
-var losses;
+var games = 0;
+var score = 0;
 
 func start_game() {
 	games = games + 1;
 	print "Please Enter Your Name";
-	name = read();
-	if (name == "Anis") {
-		return "Hello Anis";
+	if (read() == "anis") {
+		print "Welcome Anis!";
+		return 1;
 	}
-	losses = losses + 1;
-	return "I don't know you!";
+	print "I don't know you!";
+	return 0;
 }
 
 for (;;) {
-	start_game();
-
-	print "Do you want to resume the game?";
-	var choice = read();
-	if (choice != "yes") {
+	score = score + start_game();
+	print "Do you want to resume the game? (yes/no)";
+	if (read() != "yes") {
 		break;
 	}
 }
 
 print "Thank you for playing the game";
 print "Total Games Played"; print games;
-print "Total Games Lost"; print losses;
+print "Score"; print score;

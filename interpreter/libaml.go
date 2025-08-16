@@ -19,7 +19,7 @@ func (StdRead) Execute(Interpreter, []parser.Value) (parser.Value, error) {
 	if err != nil {
 		return "", err;
 	}
-	return bytes, nil;
+	return string(bytes[0:len(bytes)-1]), nil;
 }
 
 func (StdRead) String() string {

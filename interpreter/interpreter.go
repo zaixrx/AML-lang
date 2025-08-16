@@ -14,6 +14,9 @@ func (in Interpreter) VisitUnary(expr *parser.UnaryExpr) (parser.Value, error) {
 	if err != nil {
 		return nil, err;
 	}
+	if value == nil {
+		return nil, in.generate_error("cannot apply unary operator on null operand");
+	}
 	switch expr.Operator.Type {
 		case lexer.BANG: {
 			return !in.extract_boolean(value), nil;
@@ -34,9 +37,15 @@ func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error)
 	if err != nil {
 		return nil, err;
 	}
+	if leftval == nil {
+		return nil, in.generate_error("cannot apply binary operator on null left operand");
+	}
 	rightval, err := expr.ROperand.Accept(in);
 	if err != nil {
 		return nil, err;
+	}
+	if rightval == nil {
+		return nil, in.generate_error("cannot apply binary operator on null right operand");
 	}
 	switch expr.Operator.Type {
 		case lexer.PLUS: {
@@ -140,6 +149,10 @@ func (in Interpreter) VisitGroup(expr *parser.GroupingExpr) (parser.Value, error
 }
 
 func (in Interpreter) VisitLiteral(expr *parser.LiteralExpr) (parser.Value, error) {
+	if str, ok := expr.ValueLiteral.(string); ok {
+		bytes := []byte(str);
+		return string(bytes[1:len(bytes)-1]), nil;
+	}
 	return expr.ValueLiteral, nil;
 }
 
