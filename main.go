@@ -11,9 +11,9 @@ import (
 	"aml/interpreter"
 )
 
-func evalAML(interpreter *interpreter.Interpreter, filename string, content string) parser.Value {
-	scanner := lexer.NewScanner(filename, content);
-	tokens, err := scanner.Scan();
+func evalAML(interpreter *interpreter.Interpreter, filename string, content string, use_pp bool) parser.Value {
+	s := lexer.NewScanner(filename, content);
+	tokens, err := s.Scan();
 	if err != nil {
 		fmt.Println(err);
 		return nil;
@@ -21,15 +21,18 @@ func evalAML(interpreter *interpreter.Interpreter, filename string, content stri
 	// for _, token := range tokens {
 	// 	fmt.Println(token);
 	// }
-	parser := parser.NewParser(tokens);
-	stmts, err := parser.Parse();
+	p := parser.NewParser(tokens);
+	stmts, err := p.Parse();
 	if err != nil {
 		fmt.Println(err);
 		return nil;
 	}
-	// for _, stmt := range stmts {
-	//  	fmt.Println(stmt);
-	// }
+	if use_pp {
+		pp := parser.PrettyPrinter{};
+		for _, stmt := range stmts {
+		 	pp.Print(stmt);
+		}
+	}
 	val, err := interpreter.Interpret(stmts);
 	if err != nil {
 		fmt.Println(err);
@@ -38,9 +41,9 @@ func evalAML(interpreter *interpreter.Interpreter, filename string, content stri
 	return val;
 }
 
-func handleREPL() {
+func handleREPL(use_pp bool) {
 	reader := bufio.NewReader(os.Stdin);
-	interpreter := interpreter.NewInterpreter(); 
+	i := interpreter.NewInterpreter(); 
 	for {
 		fmt.Print(">> ");
 		code, err := reader.ReadString('\n');
@@ -49,34 +52,35 @@ func handleREPL() {
 			fmt.Println("Terminating REPL Process...");
 			break;
 		}
-		val := evalAML(&interpreter, "REPL", code);
+		val := evalAML(&i, "REPL", code, use_pp);
 		if val != nil {
 			fmt.Println(val);
 		}
 	}
 }
 
-func handleFile(filename string) error {
+func handleFile(filename string, use_pp bool) error {
 	bcode, err := os.ReadFile(filename);
 	if err != nil {
 		return err;
 	}
-	interpreter := interpreter.NewInterpreter();
-	evalAML(&interpreter, filename, string(bcode));
+	i := interpreter.NewInterpreter();
+	evalAML(&i, filename, string(bcode), use_pp);
 	return nil;
 }
 
 func main() {
 	repl := flag.Bool("repl", false, "use repl? else interpret file")
+	use_pp := flag.Bool("p", true, "Use PrettyPrinter to Print ASTs");
 	flag.Parse();
 	if *repl {
-		handleREPL();
+		handleREPL(*use_pp);
 	} else {
-		if len(os.Args) != 2 {
-			fmt.Printf("usage: %s <file_name>\n", os.Args[0]);
+		if len(os.Args) < 2 {
+			fmt.Printf("usage: %s <file_name> [-p]\n", os.Args[0]);
 			return;
 		}
-		err := handleFile(os.Args[1]);
+		err := handleFile(os.Args[1], *use_pp);
 		if err != nil {
 			fmt.Println(err);
 		}
