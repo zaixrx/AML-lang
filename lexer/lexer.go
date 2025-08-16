@@ -30,7 +30,7 @@ func NewScanner(filename string, source string) *Scanner {
 func (s *Scanner) add_token_literal(tt TokenType, literal any) Token {
 	token := Token{
 		Type: tt,
-		Lexeme: s.source[s.start : s.current],
+		Lexeme: string(s.source[s.start : s.current]),
 		Literal: literal,
 		Line: s.line,
 	};

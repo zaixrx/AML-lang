@@ -6,7 +6,7 @@ const EOF_RUNE = '\000';
 
 type Token struct {
 	Type TokenType
-	Lexeme []rune 
+	Lexeme string
 	Literal any
 	Line uint
 };

@@ -20,6 +20,5 @@ for (;;) {
 	}
 }
 
-print "Thank you for playing the game";
-print "Total Games Played"; print games;
-print "Score"; print score;
+print "Total Games Played:", games;
+print "Score:", score;

@@ -33,7 +33,7 @@ func (StdTime) Arity() byte {
 }
 
 func (StdTime) Execute(Interpreter, []parser.Value) (parser.Value, error) {
-	return float64(time.Now().UnixMilli()), nil;
+	return float64(time.Now().UnixNano()), nil;
 }
 
 func (StdTime) String() string {

@@ -51,7 +51,7 @@ func (p *PrettyPrinter) print_def_value(name string, vals ...Value) {
 func (p *PrettyPrinter) print_def_token(name string, toks ...lexer.Token) {
 	p.append(name, ": [");
 	for i, tok := range toks {
-		p.append_raw(string(tok.Lexeme));
+		p.append_raw(tok.Lexeme);
 		if i + 1 != len(toks) {
 			p.append_raw(", ");
 		}
@@ -79,7 +79,7 @@ func (p *PrettyPrinter) print_def_stmt(name string, stmts ...Stmt) {
 	p.untab();
 }
 
-func (p *PrettyPrinter) VisitTernary(ter *TernaryExpr) (Value, error) {
+func (p *PrettyPrinter) VisitTernary(ter TernaryExpr) (Value, error) {
 	p.print_header("Ternary");
 	p.tab();
 		p.print_def_expr("Cond", ter.Cond);
@@ -89,7 +89,7 @@ func (p *PrettyPrinter) VisitTernary(ter *TernaryExpr) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitBinary(bin *BinaryExpr) (Value, error) {
+func (p *PrettyPrinter) VisitBinary(bin BinaryExpr) (Value, error) {
 	p.print_header("Binary");
 	p.tab();
 		p.print_def_expr("LOperand", bin.LOperand);
@@ -99,7 +99,7 @@ func (p *PrettyPrinter) VisitBinary(bin *BinaryExpr) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitUnary(un *UnaryExpr) (Value, error) {
+func (p *PrettyPrinter) VisitUnary(un UnaryExpr) (Value, error) {
 	p.print_header("Unary");
 	p.tab();
 		p.print_def_expr("Operand", un.Operand);
@@ -108,7 +108,7 @@ func (p *PrettyPrinter) VisitUnary(un *UnaryExpr) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitLiteral(lit *LiteralExpr) (Value, error) {
+func (p *PrettyPrinter) VisitLiteral(lit LiteralExpr) (Value, error) {
 	p.print_header("Literal");
 	p.tab();
 		p.print_def_value("Value", lit.ValueLiteral);
@@ -116,7 +116,7 @@ func (p *PrettyPrinter) VisitLiteral(lit *LiteralExpr) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitVariable(vari *VariableExpr) (Value, error) {
+func (p *PrettyPrinter) VisitVariable(vari VariableExpr) (Value, error) {
 	p.print_header("Variable");
 	p.tab();
 		p.print_def_token("Name", vari.Name);
@@ -124,7 +124,7 @@ func (p *PrettyPrinter) VisitVariable(vari *VariableExpr) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitGroup(grp *GroupingExpr) (Value, error) {
+func (p *PrettyPrinter) VisitGroup(grp GroupingExpr) (Value, error) {
 	p.print_header("Group");
 	p.tab();
 		p.print_def_expr("InnerExpr", grp.InnerExpr);
@@ -132,7 +132,7 @@ func (p *PrettyPrinter) VisitGroup(grp *GroupingExpr) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitAssign(ass *AssignExpr) (Value, error) {
+func (p *PrettyPrinter) VisitAssign(ass AssignExpr) (Value, error) {
 	p.print_header("Assign");
 	p.tab();
 		p.print_def_token("Name", ass.Name);
@@ -141,7 +141,7 @@ func (p *PrettyPrinter) VisitAssign(ass *AssignExpr) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitFuncCall(fnc *FuncCall) (Value, error) {
+func (p *PrettyPrinter) VisitFuncCall(fnc FuncCall) (Value, error) {
 	p.print_header("FunctionCall");
 	p.tab();
 		p.print_def_expr("Calle", fnc.Callee);
@@ -150,12 +150,12 @@ func (p *PrettyPrinter) VisitFuncCall(fnc *FuncCall) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitExpr(stmt *ExprStmt) (Value, error) {
+func (p *PrettyPrinter) VisitExpr(stmt ExprStmt) (Value, error) {
 	stmt.InnerExpr.Accept(p);
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitVariableDeclaration(vard *VarDeclarationStmt) (Value, error) {
+func (p *PrettyPrinter) VisitVariableDeclaration(vard VarDeclarationStmt) (Value, error) {
 	p.print_header("VariableDeclaration");
 	p.tab();
 		p.print_def_token("Name", vard.Name);
@@ -164,7 +164,7 @@ func (p *PrettyPrinter) VisitVariableDeclaration(vard *VarDeclarationStmt) (Valu
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitFuncDeclarationStmt(fnd *FuncDeclarationStmt) (Value, error) {
+func (p *PrettyPrinter) VisitFuncDeclarationStmt(fnd FuncDeclarationStmt) (Value, error) {
 	p.print_header("FunctionDeclaration");
 	p.tab();
 		p.print_def_token("Name", fnd.Name);
@@ -174,7 +174,7 @@ func (p *PrettyPrinter) VisitFuncDeclarationStmt(fnd *FuncDeclarationStmt) (Valu
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitReturn(ret *ReturnStmt) (Value, error) {
+func (p *PrettyPrinter) VisitReturn(ret ReturnStmt) (Value, error) {
 	p.print_header("ReturnStamement");
 	p.tab();
 		p.print_def_expr("Asset", ret.Asset);
@@ -182,15 +182,15 @@ func (p *PrettyPrinter) VisitReturn(ret *ReturnStmt) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitPrint(prnt *PrintStmt) (Value, error) {
+func (p *PrettyPrinter) VisitPrint(prnt PrintStmt) (Value, error) {
 	p.print_header("PrintStatement");
 	p.tab();
-		p.print_def_expr("Asset", prnt.Asset);
+		p.print_def_expr("Asset", prnt.Assets...);
 	p.untab();
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitBlock(blk *BlockStmt) (Value, error) {
+func (p *PrettyPrinter) VisitBlock(blk BlockStmt) (Value, error) {
 	p.print_header("BlockStatement");
 	p.tab();
 		p.print_def_stmt("Body", blk.Stmts...);
@@ -198,17 +198,17 @@ func (p *PrettyPrinter) VisitBlock(blk *BlockStmt) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitBreak(*BreakStmt) (Value, error) {
+func (p *PrettyPrinter) VisitBreak(BreakStmt) (Value, error) {
 	p.print_header("BreakStatement");
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitContinue(*ContinueStmt) (Value, error) {
+func (p *PrettyPrinter) VisitContinue(ContinueStmt) (Value, error) {
 	p.print_header("ContinueStatement");
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitConditional(cond *ConditionalStmt) (Value, error) {
+func (p *PrettyPrinter) VisitConditional(cond ConditionalStmt) (Value, error) {
 	p.print_header("ConditionalStatment");
 	p.tab();
 		for _, b := range cond.Branches {
@@ -219,7 +219,7 @@ func (p *PrettyPrinter) VisitConditional(cond *ConditionalStmt) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitWhile(whl *WhileStmt) (Value, error) {
+func (p *PrettyPrinter) VisitWhile(whl WhileStmt) (Value, error) {
 	p.print_header("WhileStatement");
 	p.tab();
 		p.print_def_expr("Cond", whl.Cond);
@@ -228,7 +228,7 @@ func (p *PrettyPrinter) VisitWhile(whl *WhileStmt) (Value, error) {
 	return nil, nil;
 }
 
-func (p *PrettyPrinter) VisitFor(fors *ForStmt) (Value, error) {
+func (p *PrettyPrinter) VisitFor(fors ForStmt) (Value, error) {
 	p.print_header("ForStatement");
 	p.tab();
 		if fors.Init != nil {

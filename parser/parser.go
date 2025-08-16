@@ -191,7 +191,7 @@ func (p *Parser) declarative_statement() (Stmt, error) {
 		if !p.expect(lexer.SEMICOLON) {
 			return nil, p.generate_expect_error("';' at the end of the statement.");
 		}
-		return &VarDeclarationStmt{
+		return VarDeclarationStmt{
 			Name: id,
 			Asset: asset,
 		}, nil;
@@ -213,7 +213,7 @@ func (p *Parser) statement() (Stmt, error) {
 		if err := p.consume_if(&branches); err != nil {
 			return nil, err;
 		}
-		return &ConditionalStmt {
+		return ConditionalStmt {
 			Branches: branches,
 		}, nil;
 	}
@@ -233,7 +233,7 @@ func (p *Parser) statement() (Stmt, error) {
 		if err != nil {
 			return nil, err;
 		}
-		return &WhileStmt{
+		return WhileStmt{
 			Cond: cond,
 			NDStmt: ndstmt,
 		}, nil;
@@ -277,7 +277,7 @@ func (p *Parser) statement() (Stmt, error) {
 		if err != nil {
 			return nil, err;
 		}
-		return &ForStmt {
+		return ForStmt {
 			Init: init,
 			Cond: cond,
 			Step: step,
@@ -289,7 +289,7 @@ func (p *Parser) statement() (Stmt, error) {
 		if err != nil {
 			return nil, err;
 		}
-		return &BlockStmt{
+		return BlockStmt{
 			Stmts: stmts,
 		}, nil;
 	}
@@ -305,7 +305,7 @@ func (p *Parser) statement() (Stmt, error) {
 				return nil, p.generate_expect_error("';' at the end of the return statement");
 			}
 		}
-		return &ReturnStmt{
+		return ReturnStmt{
 			Asset: expr,
 		}, nil;
 	}
@@ -313,25 +313,34 @@ func (p *Parser) statement() (Stmt, error) {
 		if !p.expect(lexer.SEMICOLON) {
 			return nil, p.generate_expect_error("';' at the end of 'break'");
 		}
-		return &BreakStmt{}, nil;
+		return BreakStmt{}, nil;
 	}
 	if p.expect(lexer.CONTINUE) {
 		if !p.expect(lexer.SEMICOLON) {
 			return nil, p.generate_expect_error("';' at the end of 'continue'");
 		}
-		return &ContinueStmt{}, nil;
+		return ContinueStmt{}, nil;
 	}
-	// printstmt -> "print" expression ";"
+	// printstmt -> "print" expression ("," expression)* ";"
 	if p.expect(lexer.PRINT) {
 		expr, err := p.expression();
 		if err != nil {
 			return nil, err;
 		}
+		assets := make([]Expr, 1);
+		assets[0] = expr;
+		for p.expect(lexer.COMMA) {
+			expr, err := p.expression();
+			if err != nil {
+				return nil, err;
+			}
+			assets = append(assets, expr);
+		}
 		if !p.expect(lexer.SEMICOLON) {
 			return nil, p.generate_expect_error("';' at the end of the statement.");
 		}
-		return &PrintStmt{
-			Asset: expr,
+		return PrintStmt{
+			Assets: assets,
 		}, nil;
 	}
 	// exprstmt -> expression ";"
@@ -342,7 +351,7 @@ func (p *Parser) statement() (Stmt, error) {
 	if !p.expect(lexer.SEMICOLON) {
 		return nil, p.generate_expect_error("';' at the end of the statement.");
 	}
-	return &ExprStmt{
+	return ExprStmt{
 		InnerExpr: expr,
 	}, nil;
 }
@@ -364,7 +373,7 @@ func (p *Parser) expression() (Expr, error) {
 // 		if err != nil {
 // 			return nil, err;
 // 		}
-// 		return &BinaryExpr{
+// 		return BinaryExpr{
 // 			LOperand: expr,
 // 			Operator: operator,
 // 			ROperand: right,
@@ -381,7 +390,7 @@ func (p *Parser) assign() (Expr, error) {
 		if err != nil {
 			return nil, err;
 		}
-		return &AssignExpr{
+		return AssignExpr{
 			Name: tokens[0],
 			Asset: src,
 		}, nil;
@@ -408,7 +417,7 @@ func (p *Parser) ternary() (Expr, error) {
 		if err != nil {
 			return nil, err;
 		}
-		return &TernaryExpr{
+		return TernaryExpr{
 			Cond: expr,
 			Iftrue: iftrue,
 			Iffalse: iffalse,
@@ -429,7 +438,7 @@ func (p *Parser) equality() (Expr, error) {
 		if err != nil {
 			return nil, err;
 		}
-		expr = &BinaryExpr {
+		expr = BinaryExpr {
 			LOperand: expr,
 			Operator: operator,
 			ROperand: right,
@@ -450,7 +459,7 @@ func (p *Parser) comparison() (Expr, error) {
 		if err != nil {
 			return nil, err;
 		}
-		expr = &BinaryExpr {
+		expr = BinaryExpr {
 			LOperand: expr,
 			Operator: operator,
 			ROperand: right,
@@ -471,7 +480,7 @@ func (p *Parser) term() (Expr, error) {
 		if err != nil {
 			return nil, err;
 		}
-		expr = &BinaryExpr {
+		expr = BinaryExpr {
 			LOperand: expr,
 			Operator: operator,
 			ROperand: right,
@@ -492,7 +501,7 @@ func (p *Parser) factor() (Expr, error) {
 		if err != nil {
 			return nil, err;
 		}
-		expr = &BinaryExpr {
+		expr = BinaryExpr {
 			LOperand: expr,
 			Operator: operator,
 			ROperand: right,
@@ -509,7 +518,7 @@ func (p *Parser) unary() (Expr, error) {
 			return nil, err;
 		}
 		operator := p.prev();
-		return &UnaryExpr {
+		return UnaryExpr {
 			Operand: operand,
 			Operator: operator,
 		}, nil;
@@ -534,7 +543,7 @@ func (p *Parser) call() (Expr, error) {
 					return nil, p.generate_expect_error("')' in function call");
 				}
 			}
-			expr = &FuncCall{
+			expr = FuncCall{
 				Callee: expr,
 				Args: args,
 			};
@@ -548,23 +557,23 @@ func (p *Parser) call() (Expr, error) {
 // primary -> IDENTIFIER | STRING | NUMBER | "true" | "false" | "null" | "(" expression ")"
 func (p *Parser) primary() (Expr, error) {
 	if p.expect(lexer.TRUE) {
-		return &LiteralExpr{
+		return LiteralExpr{
 			ValueLiteral: true,
 		}, nil
 	} else if p.expect(lexer.FALSE) {
-		return &LiteralExpr{
+		return LiteralExpr{
 			ValueLiteral: false,
 		}, nil
 	} else if p.expect(lexer.NULL) {
-		return &LiteralExpr{
+		return LiteralExpr{
 			ValueLiteral: nil,
 		}, nil
 	} else if p.expect(lexer.STRING, lexer.NUMBER) {
-		return &LiteralExpr {
+		return LiteralExpr {
 			ValueLiteral: p.prev().Literal,
 		}, nil
 	} else if p.expect(lexer.IDENTIFIER) {
-		return &VariableExpr{
+		return VariableExpr{
 			Name: p.prev(),
 		}, nil;
 	} else if p.expect(lexer.LEFT_PAREN) {
@@ -573,7 +582,7 @@ func (p *Parser) primary() (Expr, error) {
 			return nil, err;
 		}
 		if p.expect(lexer.RIGHT_PAREN) {
-			return &GroupingExpr{
+			return GroupingExpr{
 				InnerExpr: expr,
 			}, nil;
 		}
@@ -585,7 +594,7 @@ func (p *Parser) primary() (Expr, error) {
 
 func (p *Parser) generate_expect_error(expected string) error {
 	tok := p.tokens[p.current];
-	return fmt.Errorf("Parser Error: expected %s found %s at line %d\n", expected, string(tok.Lexeme), tok.Line);
+	return fmt.Errorf("Parser Error: expected %s found %s at line %d\n", expected, tok.Lexeme, tok.Line);
 }
 
 func (p *Parser) Parse() ([]Stmt, error) {

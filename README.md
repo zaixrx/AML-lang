@@ -12,7 +12,7 @@ var start = time();
 for (var i = 0; i < 10; i = i + 1) {
     print fib(i);
 }
-print time() - start;
+print "took:", time() - start, "nano-seconds to execute";
 ```
 
 # Usage
@@ -38,14 +38,14 @@ or interpret an existing file
 ```
 
 # Resources
-- crafting interpreters: \
+- crafting interpreters:
     https://craftinginterpreters.com
-- I'm not a go developer: \
-    https://go.dev/ \
-    https://gobyexample.com/
-	.
+- I'm not a go developer:
+    https://go.dev/
+    https://gobyexample.com
+        https://go.dev/blog/pgo
 * useful theory:
-    - Regular Expressions: \
+    - Regular Expressions:
         https://web.stanford.edu/class/archive/cs/cs103/cs103.1208/lectures/14-RegExes/Regular%20Expressions.pdf
-    - Context Free Grammars: \
+    - Context Free Grammars:
         https://web.stanford.edu/class/archive/cs/cs103/cs103.1164/lectures/18/Small18.pdf

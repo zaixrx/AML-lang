@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"flag"
 	"bufio"
+	"runtime/pprof"
 
 	"aml/lexer"
 	"aml/parser"
@@ -73,6 +74,15 @@ func main() {
 	repl := flag.Bool("repl", false, "use repl? else interpret file")
 	use_pp := flag.Bool("p", false, "Use PrettyPrinter to Print ASTs");
 	flag.Parse();
+
+	f, err := os.Create("cpu.prof");
+	if err != nil {
+		fmt.Println("failed to crate cpu profile");
+		os.Exit(1);
+	}
+	pprof.StartCPUProfile(f);
+	defer pprof.StopCPUProfile()
+
 	if *repl {
 		handleREPL(*use_pp);
 	} else {

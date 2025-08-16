@@ -1,15 +1,107 @@
 package interpreter
 
 import (
-	"fmt"
-	"errors"
-	"reflect"
 	"aml/lexer"
 	"aml/parser"
-);
+	"errors"
+	"fmt"
+	"strings"
+)
+
+type ReturnError struct {
+	value parser.Value;
+}
+
+type BreakError struct {}
+
+type ContinueError struct {}
+
+func (err ReturnError) Error() string {
+	return "RUNTIME ERROR: 'return' should only be used inside a function";
+}
+
+func (err BreakError) Error() string {
+	return "RUNTIME ERROR: 'break' should only be used inside 'for' or 'while'";
+}
+
+func (err ContinueError) Error() string {
+	return "RUNTIME ERROR: 'continue' should only be used inside 'for' or 'while'";
+}
+
+type Environment struct {
+	refs map[string]parser.Value;
+	prev *Environment;
+};
+
+func NewEnvironment(prev *Environment) *Environment {
+	return &Environment{
+		refs: make(map[string]parser.Value),
+		prev: prev,
+	};
+}
+
+func (env *Environment) get(name string) (parser.Value, error) {
+	curr := env;
+	for curr != nil {
+		if value, exists := curr.refs[name]; exists {
+			return value, nil;
+		}
+		curr = curr.prev;
+	}
+	return nil, fmt.Errorf("variable %s is not declared", name);
+}
+
+func (env *Environment) declare(name string, value parser.Value) error {
+	if _, exists := env.refs[name]; exists {
+		return fmt.Errorf("variable %s is already declared", name);
+	}
+	env.refs[name] = value;
+	return nil;
+}
+
+func (env *Environment) assign(name string, new_value parser.Value) error {
+	curr := env;
+	for curr != nil {
+		if _, exists := curr.refs[name]; exists {
+			curr.refs[name] = new_value;
+			return nil;
+		}
+		curr = curr.prev;
+	}
+	return fmt.Errorf("variable %s is not declared", name);
+}
+
+type Callable interface {
+	Arity() byte;
+	Execute(in Interpreter, args []parser.Value) (parser.Value, error);
+	String() string;
+}
+
+type Interpreter struct {
+	environment *Environment;
+};
+
+func (in Interpreter) generate_error(format string, args ...any) error {
+	return fmt.Errorf("RUNTIME ERROR: %s", fmt.Sprintf(format, args...));
+}
+
+func (in Interpreter) extract_boolean(value parser.Value) bool {
+	if value == nil || value == false {
+		return false;
+	}
+	return true;
+}
+
+func (in Interpreter) extract_string(value parser.Value) string {
+	return fmt.Sprint(value);
+}
+
+func (in Interpreter) equal(a parser.Value, b parser.Value) bool {
+	return a == b;
+}
 
 // expressions
-func (in Interpreter) VisitUnary(expr *parser.UnaryExpr) (parser.Value, error) {
+func (in Interpreter) VisitUnary(expr parser.UnaryExpr) (parser.Value, error) {
 	value, err := expr.Operand.Accept(in);
 	if err != nil {
 		return nil, err;
@@ -22,17 +114,16 @@ func (in Interpreter) VisitUnary(expr *parser.UnaryExpr) (parser.Value, error) {
 			return !in.extract_boolean(value), nil;
 		};
 		case lexer.MINUS: {
-			succ, num := in.extract_number(value);
-			if !succ {
-				return nil, in.generate_error("unary '-' can only be used on numbers");
+			if num, ok := value.(float64); ok {
+				return -num, nil;
 			}
-			return -num, nil;
+			return nil, in.generate_error("unary '-' can only be used on numbers");
 		};
 	}
 	return nil, in.generate_error("invalid unary operation, got %s", expr.Operator.Type.ToString());
 }
 
-func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error) {
+func (in Interpreter) VisitBinary(expr parser.BinaryExpr) (parser.Value, error) {
 	leftval, err := expr.LOperand.Accept(in);
 	if err != nil {
 		return nil, err;
@@ -49,37 +140,45 @@ func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error)
 	}
 	switch expr.Operator.Type {
 		case lexer.PLUS: {
-			if reflect.TypeOf(leftval).Kind() == reflect.Float64 {
-				succ, nums := in.extract_numbers(leftval, rightval);
-				if !succ {
-					return nil, in.generate_error("operands in binary '+' must be numbers");
+			if lnum, ok := leftval.(float64); ok {
+				if rnum, ok := rightval.(float64); ok {
+					return lnum + rnum, nil;
 				}
-				return nums[0] + nums[1], nil;
-			} else if reflect.TypeOf(leftval).Kind() == reflect.String {
-				return string(in.extract_string(leftval) + in.extract_string(rightval)), nil;
+				return nil, in.generate_error("right operand in binary '+' must be number");
+			} else if lstr, ok := leftval.(string); ok {
+				if rstr, ok := rightval.(string); ok {
+					return lstr + rstr, nil;
+				}
+				return nil, in.generate_error("right operand in binary '+' must be string");
 			}
 			return nil, in.generate_error("operands in binary '+' must be strings or numbers");
 		};
 		case lexer.MINUS: {
-			succ, nums := in.extract_numbers(leftval, rightval);
-			if !succ {
-				return nil, in.generate_error("operands in binary '-' must be numbers");
+			if rnum, ok := rightval.(float64); ok {
+				if lnum, ok := leftval.(float64); ok {
+					return lnum - rnum, nil;
+				}
+				return nil, in.generate_error("right operand in binary '-' must be number");
 			}
-			return nums[0] - nums[1], nil;
+			return nil, in.generate_error("right operand in binary '*' must be number");
 		};
 		case lexer.STAR: {
-			succ, nums := in.extract_numbers(leftval, rightval);
-			if !succ {
-				return nil, in.generate_error("operands in binary '*' must be numbers");
+			if rnum, ok := rightval.(float64); ok {
+				if lnum, ok := leftval.(float64); ok {
+					return lnum * rnum, nil;
+				}
+				return nil, in.generate_error("right operand in binary '*' must be number");
 			}
-			return nums[0] * nums[1], nil;
+			return nil, in.generate_error("right operand in binary '*' must be number");
 		};
 		case lexer.SLASH: {
-			succ, nums := in.extract_numbers(leftval, rightval);
-			if !succ {
-				return nil, in.generate_error("operands in binary '/' must be numbers");
+			if rnum, ok := rightval.(float64); ok {
+				if lnum, ok := leftval.(float64); ok {
+					return lnum / rnum, nil;
+				}
+				return nil, in.generate_error("right operand in binary '/' must be number");
 			}
-			return nums[0] / nums[1], nil;
+			return nil, in.generate_error("right operand in binary '/' must be number");
 		};
 		case lexer.EQUAL_EQUAL: {
 			return in.equal(leftval, rightval), nil;
@@ -88,32 +187,40 @@ func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error)
 			return !in.equal(leftval, rightval), nil;
 		};
 		case lexer.GREATER: {
-			succ, nums := in.extract_numbers(leftval, rightval);
-			if !succ {
-				return nil, in.generate_error("operands in binary '>' must be numbers");
+			if rnum, ok := rightval.(float64); ok {
+				if lnum, ok := leftval.(float64); ok {
+					return lnum > rnum, nil;
+				}
+				return nil, in.generate_error("right operand in binary '>' must be number");
 			}
-			return nums[0] > nums[1], nil;
+			return nil, in.generate_error("right operand in binary '>' must be number");
 		};
 		case lexer.GREATER_EQUAL: {
-			succ, nums := in.extract_numbers(leftval, rightval);
-			if !succ {
-				return nil, in.generate_error("operands in binary '>=' must be numbers");
+			if rnum, ok := rightval.(float64); ok {
+				if lnum, ok := leftval.(float64); ok {
+					return lnum >= rnum, nil;
+				}
+				return nil, in.generate_error("right operand in binary '>=' must be number");
 			}
-			return nums[0] >= nums[1], nil;
+			return nil, in.generate_error("right operand in binary '>=' must be number");
 		};
 		case lexer.LESS: {
-			succ, nums := in.extract_numbers(leftval, rightval);
-			if !succ {
-				return nil, in.generate_error("operands in binary '<' must be numbers");
+			if rnum, ok := rightval.(float64); ok {
+				if lnum, ok := leftval.(float64); ok {
+					return lnum < rnum, nil;
+				}
+				return nil, in.generate_error("right operand in binary '<' must be number");
 			}
-			return nums[0] < nums[1], nil;
+			return nil, in.generate_error("right operand in binary '<' must be number");
 		};
 		case lexer.LESS_EQUAL: {
-			succ, nums := in.extract_numbers(leftval, rightval);
-			if !succ {
-				return nil, in.generate_error("operands in binary '<=' must be numbers");
+			if rnum, ok := rightval.(float64); ok {
+				if lnum, ok := leftval.(float64); ok {
+					return lnum <= rnum, nil;
+				}
+				return nil, in.generate_error("right operand in binary '<=' must be number");
 			}
-			return nums[0] <= nums[1], nil;
+			return nil, in.generate_error("right operand in binary '<=' must be number");
 		};
 		case lexer.AND: {
 			return in.extract_boolean(leftval) && in.extract_boolean(rightval), nil;
@@ -125,7 +232,7 @@ func (in Interpreter) VisitBinary(expr *parser.BinaryExpr) (parser.Value, error)
 	return nil, in.generate_error("invalid binary operation, got %s", expr.Operator.Type.ToString());
 }
 
-func (in Interpreter) VisitTernary(expr *parser.TernaryExpr) (parser.Value, error) {
+func (in Interpreter) VisitTernary(expr parser.TernaryExpr) (parser.Value, error) {
 	condval, err := expr.Cond.Accept(in);
 	if err != nil {
 		return nil, err;
@@ -144,11 +251,11 @@ func (in Interpreter) VisitTernary(expr *parser.TernaryExpr) (parser.Value, erro
 	return value, nil;
 }
 
-func (in Interpreter) VisitGroup(expr *parser.GroupingExpr) (parser.Value, error) {
+func (in Interpreter) VisitGroup(expr parser.GroupingExpr) (parser.Value, error) {
 	return expr.InnerExpr.Accept(in);
 }
 
-func (in Interpreter) VisitLiteral(expr *parser.LiteralExpr) (parser.Value, error) {
+func (in Interpreter) VisitLiteral(expr parser.LiteralExpr) (parser.Value, error) {
 	if str, ok := expr.ValueLiteral.(string); ok {
 		bytes := []byte(str);
 		return string(bytes[1:len(bytes)-1]), nil;
@@ -156,27 +263,27 @@ func (in Interpreter) VisitLiteral(expr *parser.LiteralExpr) (parser.Value, erro
 	return expr.ValueLiteral, nil;
 }
 
-func (in Interpreter) VisitVariable(expr *parser.VariableExpr) (parser.Value, error) {
-	value, err := in.environment.get(string(expr.Name.Lexeme));
+func (in Interpreter) VisitVariable(expr parser.VariableExpr) (parser.Value, error) {
+	value, err := in.environment.get(expr.Name.Lexeme);
 	if err != nil {
 		return nil, in.generate_error("%s", err.Error());
 	}
 	return value, nil;
 }
 
-func (in Interpreter) VisitAssign(expr *parser.AssignExpr) (parser.Value, error) {
+func (in Interpreter) VisitAssign(expr parser.AssignExpr) (parser.Value, error) {
 	value, err := expr.Asset.Accept(in);
 	if err != nil {
 		return nil, err;
 	}
-	err = in.environment.assign(string(expr.Name.Lexeme), value);
+	err = in.environment.assign(expr.Name.Lexeme, value);
 	if err != nil {
 		return nil, err;
 	}
 	return value, nil;
 }
 
-func (in Interpreter) VisitFuncCall(expr *parser.FuncCall) (parser.Value, error) {
+func (in Interpreter) VisitFuncCall(expr parser.FuncCall) (parser.Value, error) {
 	val, err := expr.Callee.Accept(in);
 	if err != nil {
 		return nil, err;
@@ -199,7 +306,7 @@ func (in Interpreter) VisitFuncCall(expr *parser.FuncCall) (parser.Value, error)
 	return fn.Execute(in, args);
 }
 
-func (in Interpreter) VisitReturn(stmt *parser.ReturnStmt) (parser.Value, error) {
+func (in Interpreter) VisitReturn(stmt parser.ReturnStmt) (parser.Value, error) {
 	var ( value parser.Value; err error = nil; );
 	if stmt.Asset != nil {
 		value, err = stmt.Asset.Accept(in);
@@ -212,20 +319,20 @@ func (in Interpreter) VisitReturn(stmt *parser.ReturnStmt) (parser.Value, error)
 	};
 }
 
-func (in Interpreter) VisitBreak(_ *parser.BreakStmt) (parser.Value, error) {
+func (in Interpreter) VisitBreak(_ parser.BreakStmt) (parser.Value, error) {
 	return nil, &BreakError{};
 }
 
-func (in Interpreter) VisitContinue(_ *parser.ContinueStmt) (parser.Value, error) {
+func (in Interpreter) VisitContinue(_ parser.ContinueStmt) (parser.Value, error) {
 	return nil, &ContinueError{};
 }
 
 // statements
-func (in Interpreter) VisitExpr(stmt *parser.ExprStmt) (parser.Value, error) {
+func (in Interpreter) VisitExpr(stmt parser.ExprStmt) (parser.Value, error) {
 	return stmt.InnerExpr.Accept(in);
 }
 
-func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) (parser.Value, error) {
+func (in Interpreter) VisitVariableDeclaration(stmt parser.VarDeclarationStmt) (parser.Value, error) {
 	var (
 		err error
 		value parser.Value = nil;
@@ -236,17 +343,17 @@ func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) 
 			return nil, err;
 		}
 	}
-	err = in.environment.declare(string(stmt.Name.Lexeme), value);
+	err = in.environment.declare(stmt.Name.Lexeme, value);
 	if err != nil {
 		return nil, in.generate_error("%s", err.Error());
 	}
 	return nil, nil;
 }
 
-func (in Interpreter) VisitFuncDeclarationStmt(stmt *parser.FuncDeclarationStmt) (parser.Value, error) {
-	err := in.environment.declare(string(stmt.Name.Lexeme), AMLFunc{
+func (in Interpreter) VisitFuncDeclarationStmt(stmt parser.FuncDeclarationStmt) (parser.Value, error) {
+	err := in.environment.declare(stmt.Name.Lexeme, AMLFunc{
 		closure: in.environment,
-		internal: parser.Func(*stmt),
+		internal: parser.Func(stmt),
 	});
 	if err != nil {
 		return nil, in.generate_error("%s", err.Error());
@@ -254,16 +361,23 @@ func (in Interpreter) VisitFuncDeclarationStmt(stmt *parser.FuncDeclarationStmt)
 	return nil, nil;
 }
 
-func (in Interpreter) VisitPrint(stmt *parser.PrintStmt) (parser.Value, error) {
-	val, err := stmt.Asset.Accept(in);
-	if err != nil {
-		return nil, err;
+func (in Interpreter) VisitPrint(stmt parser.PrintStmt) (parser.Value, error) {
+	builder := strings.Builder{};
+	for i, asset := range stmt.Assets {
+		val, err := asset.Accept(in);
+		if err != nil {
+			return nil, err;
+		}
+		if i != 0 {
+			builder.WriteString(" ");
+		}
+		builder.WriteString(in.extract_string(val));
 	}
-	fmt.Printf("%s\n", in.extract_string(val));
+	fmt.Println(builder.String());
 	return nil, nil;
 }
 
-func (in Interpreter) VisitBlock(block *parser.BlockStmt) (parser.Value, error) {
+func (in Interpreter) VisitBlock(block parser.BlockStmt) (parser.Value, error) {
 	var (
 		val parser.Value = nil;
 		env = NewEnvironment(in.environment);
@@ -286,7 +400,7 @@ func (in Interpreter) VisitBlock(block *parser.BlockStmt) (parser.Value, error) 
 	return val, nil;
 }
 
-func (in Interpreter) VisitConditional(stmt *parser.ConditionalStmt) (parser.Value, error) {
+func (in Interpreter) VisitConditional(stmt parser.ConditionalStmt) (parser.Value, error) {
 	for _, branch := range stmt.Branches {
 		if branch.Condition != nil {
 			val, err := branch.Condition.Accept(in);
@@ -306,7 +420,7 @@ func (in Interpreter) VisitConditional(stmt *parser.ConditionalStmt) (parser.Val
 	return nil, nil;
 }
 
-func (in Interpreter) VisitWhile(stmt *parser.WhileStmt) (parser.Value, error) {
+func (in Interpreter) VisitWhile(stmt parser.WhileStmt) (parser.Value, error) {
 	var (
 		err error = nil;
 		val parser.Value = nil;
@@ -326,7 +440,7 @@ loop:
 	return val, nil;
 }
 
-func (in Interpreter) VisitFor(stmt *parser.ForStmt) (parser.Value, error) {
+func (in Interpreter) VisitFor(stmt parser.ForStmt) (parser.Value, error) {
 	var (
 		err error = nil;
 		val parser.Value = nil;
@@ -339,8 +453,8 @@ func (in Interpreter) VisitFor(stmt *parser.ForStmt) (parser.Value, error) {
 		}
 	}
 	var (
-		break_err *BreakError;
-		continue_err *ContinueError;
+		break_err BreakError;
+		continue_err ContinueError;
 	);
 loop:
 	if stmt.Cond != nil {

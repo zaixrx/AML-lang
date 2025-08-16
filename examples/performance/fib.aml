@@ -1,0 +1,19 @@
+// fib(40) -> 638.5784553 seconds before last time ran
+// fib(40) -> 1069.210866 seconds last last time ran
+
+var num = 30;
+var iterations = 0;
+
+func fib(n) {
+	iterations = iterations + 1;
+	if (n <= 1) {
+		return 1;
+	}
+	return fib(n - 1) + fib(n - 2);
+}
+
+var start_time = time();
+print fib(num);
+print "it took", time() - start_time, "nanoseconds";
+print "and", iterations, "iterations";
+print "to execute fib(", num,") recursively";

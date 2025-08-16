@@ -1,0 +1,11 @@
+func sum(x) {
+	if (x == 0) {
+		return 0;
+	}
+	return x + sum(x - 1);
+}
+var start = time();
+print sum(30);
+// last test: 487168 nanoseconds
+// that is 1310797.21% (6 orders of magnitude) faster than fib
+print "took:", time() - start, "nanoseconds to calculate sum(40)";

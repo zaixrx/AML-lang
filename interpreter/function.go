@@ -21,7 +21,7 @@ func (fn AMLFunc) Execute(in Interpreter, args []parser.Value) (parser.Value, er
 	env := NewEnvironment(fn.closure); in.environment = env;
 	defer func() { in.environment = old_env; }();
 	for i, arg := range args {
-		err := env.declare(string(fn.internal.Params[i].Lexeme), arg);
+		err := env.declare(fn.internal.Params[i].Lexeme, arg);
 		if err != nil {
 			return nil, err;
 		}
@@ -43,5 +43,5 @@ func (fn AMLFunc) Execute(in Interpreter, args []parser.Value) (parser.Value, er
 }
 
 func (fn AMLFunc) String() string {
-	return fmt.Sprintf("function %s/%d", string(fn.internal.Name.Lexeme), fn.Arity());
+	return fmt.Sprintf("function %s/%d", fn.internal.Name.Lexeme, fn.Arity());
 }
