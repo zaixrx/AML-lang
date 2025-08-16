@@ -156,7 +156,7 @@ func (in Interpreter) VisitAssign(expr *parser.AssignExpr) (parser.Value, error)
 	if err != nil {
 		return nil, err;
 	}
-	err = in.environment.assign(expr.Name, value);
+	err = in.environment.assign(string(expr.Name.Lexeme), value);
 	if err != nil {
 		return nil, err;
 	}
@@ -223,7 +223,7 @@ func (in Interpreter) VisitVariableDeclaration(stmt *parser.VarDeclarationStmt) 
 			return nil, err;
 		}
 	}
-	err = in.environment.declare(stmt.Name, value);
+	err = in.environment.declare(string(stmt.Name.Lexeme), value);
 	if err != nil {
 		return nil, in.generate_error("%s", err.Error());
 	}

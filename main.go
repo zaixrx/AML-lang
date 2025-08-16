@@ -27,6 +27,9 @@ func evalAML(interpreter *interpreter.Interpreter, filename string, content stri
 		fmt.Println(err);
 		return nil;
 	}
+	// for _, stmt := range stmts {
+	//  	fmt.Println(stmt);
+	// }
 	val, err := interpreter.Interpret(stmts);
 	if err != nil {
 		fmt.Println(err);

@@ -26,7 +26,7 @@ type ExprStmt struct {
 }
 
 type VarDeclarationStmt struct {
-	Name string;
+	Name lexer.Token;
 	Asset Expr;
 }
 

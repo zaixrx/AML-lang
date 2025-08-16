@@ -8,8 +8,3 @@ func get_fib() {
 }
 var fib = get_fib();
 print fib(10);
-// get_fib()(10); won't work because
-// fib is a recursive function that
-// means it needs to refer to itself
-// which requires it to be stored in
-// a local or an outer environment

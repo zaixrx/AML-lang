@@ -192,7 +192,7 @@ func (p *Parser) declarative_statement() (Stmt, error) {
 			return nil, p.generate_expect_error("';' at the end of the statement.");
 		}
 		return &VarDeclarationStmt{
-			Name: string(id.Lexeme),
+			Name: id,
 			Asset: asset,
 		}, nil;
 	}
@@ -382,7 +382,7 @@ func (p *Parser) assign() (Expr, error) {
 			return nil, err;
 		}
 		return &AssignExpr{
-			Name: string(tokens[0].Lexeme),
+			Name: tokens[0],
 			Asset: src,
 		}, nil;
 	}

@@ -48,7 +48,7 @@ type GroupingExpr struct {
 };
 
 type AssignExpr struct {
-	Name string;
+	Name lexer.Token;
 	Asset Expr;
 };
 

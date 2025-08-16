@@ -1,0 +1,33 @@
+// print formatting
+// post-pre increment expressions
+// += *= /= -=
+// do while
+
+var name;
+var games;
+var losses;
+
+func start_game() {
+	games = games + 1;
+	print "Please Enter Your Name";
+	name = read();
+	if (name == "Anis") {
+		return "Hello Anis";
+	}
+	losses = losses + 1;
+	return "I don't know you!";
+}
+
+for (;;) {
+	start_game();
+
+	print "Do you want to resume the game?";
+	var choice = read();
+	if (choice != "yes") {
+		break;
+	}
+}
+
+print "Thank you for playing the game";
+print "Total Games Played"; print games;
+print "Total Games Lost"; print losses;
