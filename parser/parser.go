@@ -513,11 +513,11 @@ func (p *Parser) factor() (Expr, error) {
 // unary   -> primary | (("!" | "-") unary)*
 func (p *Parser) unary() (Expr, error) {
 	if p.expect(lexer.BANG, lexer.MINUS) {
+		operator := p.prev();
 		operand, err := p.unary();
 		if err != nil {
 			return nil, err;
 		}
-		operator := p.prev();
 		return UnaryExpr {
 			Operand: operand,
 			Operator: operator,
