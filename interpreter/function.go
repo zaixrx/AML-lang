@@ -33,7 +33,7 @@ func (fn AMLFunc) Execute(in Interpreter, args []parser.Value) (parser.Value, er
 	for _, stmt := range fn.internal.Body {
 		if _, err := stmt.Accept(in); err != nil {
 			if errors.As(err, &reterr) {
-				retvalue = reterr.value;
+				retvalue = reterr.val;
 				break;
 			}
 			return nil, err;

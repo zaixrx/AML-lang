@@ -15,9 +15,8 @@ func start_game() {
 for (;;) {
 	score = score + start_game();
 	print "Do you want to resume the game? (yes/no)";
-	if (read() != "yes") {
-		break;
-	}
+	// TODO: break does not work here
+	if (read() != "yes") break;
 }
 
 print "Total Games Played:", games;

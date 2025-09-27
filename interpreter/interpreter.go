@@ -9,24 +9,14 @@ import (
 )
 
 type ReturnError struct {
-	value parser.Value;
+	val parser.Value
 }
-
-type BreakError struct {}
-
-type ContinueError struct {}
-
-func (err ReturnError) Error() string {
+func (e *ReturnError) Error() string {
 	return "RUNTIME ERROR: 'return' should only be used inside a function";
 }
 
-func (err BreakError) Error() string {
-	return "RUNTIME ERROR: 'break' should only be used inside 'for' or 'while'";
-}
-
-func (err ContinueError) Error() string {
-	return "RUNTIME ERROR: 'continue' should only be used inside 'for' or 'while'";
-}
+var BreakError = fmt.Errorf("RUNTIME ERROR: 'break' should only be used inside 'for' or 'while'");
+var ContinueError = fmt.Errorf("RUNTIME ERROR: 'continue' should only be used inside 'for' or 'while'");
 
 type Environment struct {
 	refs map[string]parser.Value;
@@ -307,24 +297,22 @@ func (in Interpreter) VisitFuncCall(expr parser.FuncCall) (parser.Value, error) 
 }
 
 func (in Interpreter) VisitReturn(stmt parser.ReturnStmt) (parser.Value, error) {
-	var ( value parser.Value; err error = nil; );
+	var ( val parser.Value; err error = nil; );
 	if stmt.Asset != nil {
-		value, err = stmt.Asset.Accept(in);
+		val, err = stmt.Asset.Accept(in);
 		if err != nil {
 			return nil, err;
 		}
 	}
-	return nil, &ReturnError{
-		value: value,
-	};
+	return nil, &ReturnError{ val: val };
 }
 
 func (in Interpreter) VisitBreak(_ parser.BreakStmt) (parser.Value, error) {
-	return nil, &BreakError{};
+	return nil, BreakError;
 }
 
 func (in Interpreter) VisitContinue(_ parser.ContinueStmt) (parser.Value, error) {
-	return nil, &ContinueError{};
+	return nil, ContinueError;
 }
 
 // statements
@@ -433,10 +421,16 @@ loop:
 	if in.extract_boolean(cond) {
 		val, err = stmt.NDStmt.Accept(in);
 		if err != nil {
-			return nil, err;
+			if errors.Is(err, BreakError) {
+				goto exit_loop;
+			}
+			if errors.Is(err, ContinueError) {
+				return nil, err;
+			}
 		}
 		goto loop;
 	}
+exit_loop:
 	return val, nil;
 }
 
@@ -452,10 +446,6 @@ func (in Interpreter) VisitFor(stmt parser.ForStmt) (parser.Value, error) {
 			return nil, err;
 		}
 	}
-	var (
-		break_err BreakError;
-		continue_err ContinueError;
-	);
 loop:
 	if stmt.Cond != nil {
 		cond, err = stmt.Cond.Accept(in)
@@ -466,11 +456,10 @@ loop:
 	if in.extract_boolean(cond) {
 		val, err = stmt.NDStmt.Accept(in);
 		if err != nil {
-			if errors.As(err, &break_err) {
+			if errors.Is(err, BreakError) {
 				goto exit_loop;
 			}
-			// continue will basically continue
-			if !errors.As(err, &continue_err) {
+			if errors.Is(err, ContinueError) {
 				return nil, err;
 			}
 		}

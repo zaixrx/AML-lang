@@ -80,6 +80,7 @@ func main() {
 		fmt.Println("failed to crate cpu profile");
 		os.Exit(1);
 	}
+
 	pprof.StartCPUProfile(f);
 	defer pprof.StopCPUProfile()
 
