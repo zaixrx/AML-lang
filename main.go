@@ -22,7 +22,7 @@ func evalAML(interpreter *interpreter.Interpreter, filename string, content stri
 	// for _, token := range tokens {
 	// 	fmt.Println(token);
 	// }
-	p := parser.NewParser(tokens);
+	p := parser.NewParser(filename, tokens);
 	stmts, err := p.Parse();
 	if err != nil {
 		fmt.Println(err);

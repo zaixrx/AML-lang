@@ -14,11 +14,13 @@ type Value = any;
 
 type Parser struct {
 	current int;
+	filename string;
 	tokens []lexer.Token;
 };
 
-func NewParser(tokens []lexer.Token) *Parser {
+func NewParser(filename string, tokens []lexer.Token) *Parser {
 	return &Parser {
+		filename: filename,
 		tokens: tokens,
 		current: 0,
 	};
@@ -593,8 +595,8 @@ func (p *Parser) primary() (Expr, error) {
 // recursive decent end
 
 func (p *Parser) generate_expect_error(expected string) error {
-	tok := p.tokens[p.current];
-	return fmt.Errorf("Parser Error: expected %s found %s at line %d\n", expected, tok.Lexeme, tok.Line);
+	tok := p.tokens[p.current-1];
+	return fmt.Errorf("ERROR at %s:%d: got %s, expected %s", p.filename, tok.Line, tok.Lexeme, expected);
 }
 
 func (p *Parser) Parse() ([]Stmt, error) {
